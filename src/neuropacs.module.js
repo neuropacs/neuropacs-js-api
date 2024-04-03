@@ -247,12 +247,14 @@ class Neuropacs {
       this.datasetUpload = !0;
       let a = t.length;
       for (let n = 0; n < a; n++) {
-        let i = t[n];
-        await this.upload(i, r, e), this.printProgressBar(n + 1, a);
+        let i = t[n],
+          s = await this.upload(i, r, e);
+        if (201 != s) throw Error("File upload failed!");
+        this.printProgressBar(n + 1, a);
       }
       return r;
-    } catch (s) {
-      if ((console.log(s), s.neuropacsError)) throw Error(s.neuropacsError);
+    } catch (o) {
+      if ((console.log(o), o.neuropacsError)) throw Error(o.neuropacsError);
       throw Error("Dataset upload failed!");
     }
   }
@@ -281,29 +283,21 @@ class Neuropacs {
       d = { "Content-Disposition": "form-data", filename: a },
       p = "neuropacs----------",
       u = "\r\n",
-      y = `--${p}${u}`,
-      w = `--${p}--${u}`,
-      f = y;
+      w = `--${p}${u}`,
+      y = `--${p}--${u}`,
+      f = w;
     for (let [g, C] of Object.entries(d)) f += `${g}: ${C};`;
     (f += u),
       (f += "Content-Type: application/octet-stream"),
       (f += `${u}${u}`);
     let m = new TextEncoder().encode(f),
-      A;
-    if (t instanceof Uint8Array)
-      A = await this.encryptAesCtr(t, this.aesKey, "Uint8Array", "bytes");
-    else if (t instanceof File) {
-      let E = await this.readFileAsArrayBuffer(t);
-      A = await this.encryptAesCtr(
-        new Uint8Array(E),
-        this.aesKey,
-        "Uint8Array",
-        "bytes"
-      );
-    } else throw { neuropacsError: "Unsupported data type!" };
-    let S = new Uint8Array([...m, ...A, ...new TextEncoder().encode(w)]),
-      b = await fetch(h, { method: "PUT", body: S });
-    if (!b.ok) throw { neuropacsError: `${await b.text()}` };
+      E;
+    if (t instanceof Uint8Array) E = t;
+    else if (t instanceof File) E = await this.readFileAsArrayBuffer(t);
+    else throw { neuropacsError: "Unsupported data type!" };
+    let S = new Uint8Array([...m, ...E, ...new TextEncoder().encode(y)]),
+      A = await fetch(h, { method: "PUT", body: S });
+    if (!A.ok) throw { neuropacsError: `${await A.text()}` };
     return 201;
   }
   uint8ArrayToBase64(t) {

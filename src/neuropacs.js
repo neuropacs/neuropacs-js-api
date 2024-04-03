@@ -471,8 +471,6 @@ class Neuropacs {
    * Upload a dataset to the socket
    * @param {Array<File>/Array<Uint8Array>} dataset
    * @param {String} orderId Base64 order_id.
-   * @param {String} connectionId Base64 connection_id.
-   * @param {String} aesKey Base64 AES key.
    * @returns {Number} Upload completion status
    */
   async uploadDataset(dataset, orderId = null) {
@@ -489,7 +487,10 @@ class Neuropacs {
 
       for (let i = 0; i < totalFiles; i++) {
         const curData = dataset[i];
-        await this.upload(curData, datasetId, orderId);
+        const status = await this.upload(curData, datasetId, orderId);
+        if (status != 201) {
+          throw new Error("File upload failed!");
+        }
         this.printProgressBar(i + 1, totalFiles);
       }
 
@@ -589,23 +590,12 @@ class Neuropacs {
 
     const headerBytes = new TextEncoder().encode(header);
 
-    let encryptedBinaryData;
+    let binaryData;
 
     if (data instanceof Uint8Array) {
-      encryptedBinaryData = await this.encryptAesCtr(
-        data,
-        this.aesKey,
-        "Uint8Array",
-        "bytes"
-      );
+      binaryData = data;
     } else if (data instanceof File) {
-      const binaryData = await this.readFileAsArrayBuffer(data);
-      encryptedBinaryData = await this.encryptAesCtr(
-        new Uint8Array(binaryData),
-        this.aesKey,
-        "Uint8Array",
-        "bytes"
-      );
+      binaryData = await this.readFileAsArrayBuffer(data);
     } else {
       throw { neuropacsError: "Unsupported data type!" };
     }
@@ -613,7 +603,7 @@ class Neuropacs {
     // construct message
     const message = new Uint8Array([
       ...headerBytes,
-      ...encryptedBinaryData,
+      ...binaryData,
       ...new TextEncoder().encode(END)
     ]);
 

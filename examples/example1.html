@@ -56,10 +56,12 @@
           // const job = await npcs.runJob(productId);
 
           // // CHECK STATUS
-          // const status = await npcs.checkStatus(order);
+          // const status = await npcs.checkStatus("TEST");
+          // console.log(status);
 
           // // GET RESULTS
-          // const results = await npcs.getResults(format, order);
+          const results = await npcs.getResults(format, "TEST");
+          console.log(results);
         } catch (e) {
           console.log(e);
         }
