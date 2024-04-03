@@ -10,64 +10,47 @@
     <title>NeuroPACS SDK Example</title>
   </head>
   <body>
+    <form id="uploadForm">
+      <input type="file" id="imageFiles" name="imageFiles" multiple />
+      <button type="submit">Upload Dataset</button>
+    </form>
+
     <script>
-      async function main() {
-        const apiKey = "m0ig54amrl87awtwlizcuji2bxacjm";
-        const serverUrl =
-          "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
-        // const socketUrl = "ws://localhost:5000";
-        const productId = "PD/MSA/PSP-v1.0";
-        const client = "API";
-        const format = "XML";
+      // Add an event listener to the form for the submit event
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault(); // Prevent the default form submission
 
-        try {
-          // INITIALIZE NEUROPACS SDK
-          const npcs = Neuropacs.init(serverUrl, apiKey);
+          const apiKey = "m0ig54amrl87awtwlizcuji2bxacjm";
+          const serverUrl =
+            "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
+          // const socketUrl = "ws://localhost:5000";
+          const productId = "PD/MSA/PSP-v1.0";
+          const client = "API";
+          const format = "XML";
 
-          // CONNECT TO NEUROPACS
-          const conn = await npcs.connect();
-          console.log(conn);
+          const files = document.getElementById("imageFiles").files;
 
-          // CREATE A NEW JOB
-          const orderID = await npcs.newJob();
-          console.log(orderID);
+          if (files.length > 0) {
+            const npcs = Neuropacs.init(serverUrl, apiKey);
 
-          // UPLOAD A FILE/DATASET
-          const blobData1 = new Blob(["Hello, world!"], { type: "text/plain" });
-          const file1 = new File([blobData1], "example1.txt", {
-            type: "text/plain"
-          });
-          const blobData2 = new Blob(["Hello, world!"], { type: "text/plain" });
-          const file2 = new File([blobData2], "example2.txt", {
-            type: "text/plain"
-          });
-          const blobData3 = new Blob(["Hello, world!"], { type: "text/plain" });
-          const file3 = new File([blobData3], "example3.txt", {
-            type: "text/plain"
-          });
+            // CONNECT TO NEUROPACS
+            const conn = await npcs.connect();
+            console.log(conn);
 
-          const dataset = [file1, file2, file3];
+            // CREATE A NEW JOB
+            const orderID = await npcs.newJob();
+            console.log(orderID);
+            // upload_dataset(files); // Call the upload function with the selected files
 
-          const datasetID = await npcs.uploadDataset(dataset);
+            const datasetID = await npcs.uploadDataset(files);
 
-          console.log(datasetID);
-
-          // START A JOB
-          // const job = await npcs.runJob(productId);
-
-          // // CHECK STATUS
-          // const status = await npcs.checkStatus("TEST");
-          // console.log(status);
-
-          // // GET RESULTS
-          const results = await npcs.getResults(format, "TEST");
-          console.log(results);
-        } catch (e) {
-          console.log(e);
-        }
-      }
-
-      main();
+            console.log(datasetID);
+          } else {
+            alert("Please select files to upload.");
+          }
+        });
     </script>
   </body>
 </html>

@@ -5,8 +5,6 @@
  * (c) 2024 Kerrick Cavanaugh
  * Released under the MIT License.
  */
-const io = require("../lib/socket.io.min.js");
-
 class Neuropacs {
   constructor(t, e, r = "api") {
     (this.readFileAsArrayBuffer = async (t) =>
@@ -293,11 +291,13 @@ class Neuropacs {
     let m = new TextEncoder().encode(f),
       E;
     if (t instanceof Uint8Array) E = t;
-    else if (t instanceof File) E = await this.readFileAsArrayBuffer(t);
-    else throw { neuropacsError: "Unsupported data type!" };
-    let S = new Uint8Array([...m, ...E, ...new TextEncoder().encode(y)]),
-      A = await fetch(h, { method: "PUT", body: S });
-    if (!A.ok) throw { neuropacsError: `${await A.text()}` };
+    else if (t instanceof File) {
+      let S = await this.readFileAsArrayBuffer(t);
+      E = new Uint8Array(S);
+    } else throw { neuropacsError: "Unsupported data type!" };
+    let A = new Uint8Array([...m, ...E, ...new TextEncoder().encode(y)]),
+      T = await fetch(h, { method: "PUT", body: A });
+    if (!T.ok) throw { neuropacsError: `${await T.text()}` };
     return 201;
   }
   uint8ArrayToBase64(t) {

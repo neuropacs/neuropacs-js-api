@@ -525,6 +525,7 @@ class Neuropacs {
     } else if (data instanceof File) {
       // Assuming 'data' is a File object or a string representing a file path
       const file = data instanceof File ? data : await this.readFile(data);
+
       if (file.name) {
         filename = file.name;
       } else {
@@ -595,7 +596,8 @@ class Neuropacs {
     if (data instanceof Uint8Array) {
       binaryData = data;
     } else if (data instanceof File) {
-      binaryData = await this.readFileAsArrayBuffer(data);
+      const arrayBuff = await this.readFileAsArrayBuffer(data);
+      binaryData = new Uint8Array(arrayBuff);
     } else {
       throw { neuropacsError: "Unsupported data type!" };
     }
