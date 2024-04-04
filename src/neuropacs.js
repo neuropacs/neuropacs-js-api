@@ -571,25 +571,45 @@ class Neuropacs {
     const form = {
       "Content-Disposition": "form-data",
       filename: filename
-      // name: "test123"
     };
 
-    const BOUNDARY = "neuropacs----------";
-    const DELIM = ";";
-    const CRLF = "\r\n";
-    const SEPARATOR = `--${BOUNDARY}${CRLF}`;
-    const END = `--${BOUNDARY}--${CRLF}`;
-    const CONTENT_TYPE = "Content-Type: application/octet-stream";
+    const encoder = new TextEncoder();
+
+    const BOUNDARY = encoder.encode("neuropacs----------");
+    const DELIM = encoder.encode(";");
+    const CRLF = encoder.encode("\r\n");
+    const SEPARATOR = new Uint8Array([
+      ...encoder.encode("--"),
+      ...BOUNDARY,
+      ...CRLF
+    ]);
+    const END = new Uint8Array([
+      ...encoder.encode("--"),
+      ...BOUNDARY,
+      ...encoder.encode("--"),
+      ...CRLF
+    ]);
+    const CONTENT_TYPE = encoder.encode(
+      "Content-Type: application/octet-stream"
+    );
 
     let header = SEPARATOR;
-    for (const [key, value] of Object.entries(form)) {
-      header += `${key}: ${value}${DELIM}`;
-    }
-    header += CRLF;
-    header += CONTENT_TYPE;
-    header += `${CRLF}${CRLF}`;
 
-    const headerBytes = new TextEncoder().encode(header);
+    for (const [key, value] of Object.entries(form)) {
+      const formField = encoder.encode(`${key}: ${value}`);
+      header = new Uint8Array([...header, ...formField, ...DELIM]);
+    }
+    header = new Uint8Array([
+      ...header,
+      ...CRLF,
+      ...CONTENT_TYPE,
+      ...CRLF,
+      ...CRLF
+    ]);
+
+    const headerBytes = header;
+
+    const footerBytes = END;
 
     let binaryData;
 
@@ -603,10 +623,17 @@ class Neuropacs {
     }
 
     // construct message
+    // const wrappedData = new Uint8Array(
+    //   headerBytes.length + binaryData.length + footerBytes.length
+    // );
+    // wrappedData.set(headerBytes, 0);
+    // wrappedData.set(binaryData, headerBytes.length);
+    // wrappedData.set(footerBytes, headerBytes.length + data.length);
+    // console.log(wrappedData);
     const message = new Uint8Array([
       ...headerBytes,
       ...binaryData,
-      ...new TextEncoder().encode(END)
+      ...footerBytes
     ]);
 
     //upload to s3 with presigned url
