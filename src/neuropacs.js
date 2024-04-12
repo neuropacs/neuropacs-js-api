@@ -471,9 +471,10 @@ class Neuropacs {
    * Upload a dataset to the socket
    * @param {Array<File>/Array<Uint8Array>} dataset
    * @param {String} orderId Base64 order_id.
+   * @param {Function} callback Callback for progress updates
    * @returns {Number} Upload completion status
    */
-  async uploadDataset(dataset, orderId = null) {
+  async uploadDataset(dataset, orderId = null, callback = null) {
     try {
       if (orderId == null) {
         orderId = this.orderID;
@@ -489,14 +490,28 @@ class Neuropacs {
         const curData = dataset[i];
         const status = await this.upload(curData, datasetId, orderId);
         if (status != 201) {
+          if (callback) {
+            callback({
+              datasetId: datasetId,
+              error: "Dataset upload failed."
+            });
+          }
           throw new Error("File upload failed!");
+        }
+        if (callback) {
+          const filesUploaded = i + 1;
+          const progress = Math.floor(filesUploaded / totalFiles);
+          callback({
+            datasetId: datasetId,
+            progress: progress,
+            filesUploaded: filesUploaded
+          });
         }
         this.printProgressBar(i + 1, totalFiles);
       }
 
       return datasetId;
     } catch (error) {
-      console.log(error);
       if (error.neuropacsError) {
         throw new Error(error.neuropacsError);
       } else {
