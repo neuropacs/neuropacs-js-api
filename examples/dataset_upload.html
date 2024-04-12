@@ -43,7 +43,9 @@
             console.log(orderID);
             // upload_dataset(files); // Call the upload function with the selected files
 
-            const datasetID = await npcs.uploadDataset(files);
+            const datasetID = await npcs.uploadDataset(files, null, (info) => {
+              console.log(info);
+            });
 
             console.log(datasetID);
           } else {

@@ -493,17 +493,21 @@ class Neuropacs {
           if (callback) {
             callback({
               datasetId: datasetId,
-              error: "Dataset upload failed."
+              error: "Dataset upload failed.",
+              progress: -1
             });
           }
           throw new Error("File upload failed!");
         }
         if (callback) {
           const filesUploaded = i + 1;
-          const progress = Math.floor(filesUploaded / totalFiles);
+          const progress = parseFloat(
+            ((filesUploaded / totalFiles) * 100).toFixed(2)
+          );
+
           callback({
             datasetId: datasetId,
-            progress: progress,
+            progress: progress == 100.0 ? 100 : progress,
             filesUploaded: filesUploaded
           });
         }
