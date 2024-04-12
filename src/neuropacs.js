@@ -668,6 +668,74 @@ class Neuropacs {
     return 201; // Upload success status code
   }
 
+  async validateUpload(
+    fileArray,
+    datasetId,
+    orderId = null,
+    connectionId = null
+  ) {
+    if (orderId == null) {
+      orderId = this.orderId;
+    }
+    if (connectionId == null) {
+      connectionId = this.connectionId;
+    }
+    try {
+      //encrypt order ID
+      const encryptedOrderId = await this.encryptAesCtr(
+        orderId,
+        this.aesKey,
+        "string",
+        "string"
+      );
+
+      const url = `${this.serverUrl}/api/verifyUpload/`;
+      const headers = {
+        "Content-Type": "text/plain",
+        "Dataset-Id": datasetId,
+        "Order-Id": encryptedOrderId,
+        "Connection-Id": this.connectionId,
+        Client: this.client
+      };
+
+      const body = {
+        fileArray: fileArray
+      };
+
+      const encryptedBody = await this.encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
+
+      if (!response.ok) {
+        throw { neuropacsError: `${await response.text()}` };
+      }
+
+      const text = await response.text();
+      const decryptedDatasetValidation = await this.decryptAesCtr(
+        text,
+        this.aesKey,
+        "JSON"
+      );
+
+      return decryptedDatasetValidation;
+    } catch (error) {
+      if (error.neuropacsError) {
+        throw new Error(error.neuropacsError);
+      } else {
+        throw new Error("Dataset validation failed!");
+      }
+    }
+  }
+
   uint8ArrayToBase64(uint8Array) {
     let binary = "";
     uint8Array.forEach((byte) => {
@@ -793,11 +861,10 @@ class Neuropacs {
    * @returns  AES encrypted file data in specified format
    */
   async getResults(format, orderId = null, datasetId = null) {
+    if (orderId == null) {
+      orderId = this.orderId;
+    }
     try {
-      if (orderId == null) {
-        orderId = this.orderId;
-      }
-
       const url = `${this.serverUrl}/api/getResults/`;
       const headers = {
         "Content-Type": "text/plain",
