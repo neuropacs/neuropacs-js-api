@@ -12,7 +12,7 @@
   <body>
     <script>
       async function main() {
-        const apiKey = "m0ig54amrl87awtwlizcuji2bxacjm";
+        const apiKey = "m0ig54amrl87awtwlizcuji2bxacjn";
         const serverUrl =
           "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
         const productId = "PD/MSA/PSP-v1.0";
@@ -25,25 +25,26 @@
         const conn = await npcs.connect();
         // console.log(conn);
 
-        const arr = [
-          "woo_I0",
-          "woo_I2",
-          "woo_I3",
-          "woo_I4",
-          "woo_I7",
-          "woo_I8",
-          "TEST234",
-          "woo_I9",
-          "woo_I10",
-          "woo_I11"
-        ];
+        // const arr = [
+        //   "woo_I0",
+        //   "woo_I2",
+        //   "woo_I3",
+        //   "woo_I4",
+        //   "woo_I7",
+        //   "woo_I8",
+        //   "SHOULD_BE_MISSING",
+        //   "TestSEIUNF",
+        //   "woo_I9",
+        //   "woo_I10",
+        //   "woo_I11"
+        // ];
 
-        const valDat = await npcs.validateUpload(
-          arr,
-          "AHw8Wqpb2Ts8ffeTvlAR",
-          "I2C1mIU8IsiFwkTZfpsd"
-        );
-        console.log(valDat);
+        // const valDat = await npcs.validateUpload(
+        //   arr,
+        //   "AHw8Wqpb2Ts8ffeTvlAR",
+        //   "I2C1mIU8IsiFwkTZfpsd"
+        // );
+        // console.log(valDat);
 
         // // RUN A JOB
         // const order = await npcs.runJob(

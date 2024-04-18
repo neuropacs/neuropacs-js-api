@@ -411,7 +411,8 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
       }
 
       const json = await response.json();
@@ -451,7 +452,8 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
       }
 
       const text = await response.text();
@@ -716,7 +718,8 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
       }
 
       const text = await response.text();
@@ -785,7 +788,8 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
       }
 
       return response.status;
@@ -837,7 +841,8 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
       }
 
       const text = await response.text();
@@ -900,7 +905,8 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
       }
 
       const text = await response.text();
