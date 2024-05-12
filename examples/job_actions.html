@@ -49,13 +49,16 @@
         // RUN A JOB
         const order = await npcs.runJob(
           productId,
-          "HgG5Xf39TpDSZlzQ4rUq",
-          "test5_fast"
+          "gGO2upzaV9x7W94zH59V",
+          "unzipper-test13"
         );
         console.log(order);
 
-        // const status = await npcs.getResults("TXT", "TEST", "TEST");
-        // console.log(status);
+        const status = await npcs.checkStatus("TEST", "TEST");
+        console.log(status);
+
+        const results = await npcs.getResults("TXT", "TEST", "TEST");
+        console.log(results);
       }
       main();
     </script>

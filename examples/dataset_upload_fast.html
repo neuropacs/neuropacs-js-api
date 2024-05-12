@@ -31,26 +31,40 @@
 
           const files = document.getElementById("imageFiles").files;
 
+          // console.log(files);
+
+          const fileList = [];
+
+          for (let i = 0; i < files.length; i++) {
+            fileList.push(files[i].name);
+          }
+
+          // console.log(fileList);
+
           if (files.length > 0) {
             const npcs = Neuropacs.init(serverUrl, apiKey);
-
             // CONNECT TO NEUROPACS
             const conn = await npcs.connect();
             console.log(conn);
+            // // CREATE A NEW JOB
+            // const orderID = await npcs.newJob();
+            // console.log(orderID);
+            // // upload_dataset(files); // Call the upload function with the selected files
+            // const datasetID = await npcs.uploadDataset(
+            //   files,
+            //   "unzipper-test13",
+            //   orderID,
+            //   (info) => {
+            //     console.log(info);
+            //   }
+            // );
 
-            // CREATE A NEW JOB
-            const orderID = await npcs.newJob();
-            console.log(orderID);
-            // upload_dataset(files); // Call the upload function with the selected files
-
-            const datasetID = await npcs.uploadDataset(
-              files,
-              "test5_fast",
-              orderID,
-              (info) => {
-                console.log(info);
-              }
+            const verifyUpload = await npcs.validateUpload(
+              fileList,
+              "unzipper-test13",
+              "gGO2upzaV9x7W94zH59V"
             );
+            console.log(verifyUpload);
 
             // console.log(datasetID);
           } else {
