@@ -210,7 +210,7 @@ class Neuropacs {
         } else {
           throw new Error("Invalid plaintext format!");
         }
-      } catch (e) {
+      } catch (error) {
         if (error) {
           throw new Error(error);
         } else {
@@ -361,6 +361,46 @@ class Neuropacs {
     };
 
     /**
+     * Load external dependency script
+     */
+    this.loadScript = (url) => {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = url;
+        script.async = true;
+
+        script.onload = () => {
+          // console.log(`Script loaded successfully from ${url}`);
+          resolve(); // Resolve the promise when the script is loaded
+        };
+        script.onerror = () => {
+          reject(new Error(`Script failed to load from ${url}`));
+        };
+
+        document.head.appendChild(script);
+      });
+    };
+
+    this.getBlobDataAsUint8Array = (blob) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = function (event) {
+          // Convert ArrayBuffer to Uint8Array
+          const arrayBuffer = event.target.result;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          resolve(uint8Array);
+        };
+
+        reader.onerror = function (error) {
+          reject(error);
+        };
+
+        // Read the blob as an ArrayBuffer
+        reader.readAsArrayBuffer(blob);
+      });
+    };
+    /**
      * Constructor
      */
     this.apiKey = apiKey;
@@ -469,61 +509,418 @@ class Neuropacs {
     }
   }
 
-  /**
-   * Upload a dataset to the socket
-   * @param {Array<File>/Array<Uint8Array>} dataset
-   * @param {String} orderId Base64 order_id.
-   * @param {Function} callback Callback for progress updates
-   * @returns {Number} Upload completion status
-   */
-  async uploadDataset(dataset, orderId = null, callback = null) {
-    try {
-      if (orderId == null) {
-        orderId = this.orderID;
+  // /**
+  //  * Upload a dataset to the socket
+  //  * @param {Array<File>/Array<Uint8Array>} dataset
+  //  * @param {String} orderId Base64 order_id.
+  //  * @param {Function} callback Callback for progress updates
+  //  * @returns {Number} Upload completion status
+  //  */
+  // async uploadDataset(dataset, orderId = null, callback = null) {
+  //   try {
+  //     if (orderId == null) {
+  //       orderId = this.orderID;
+  //     }
+
+  //     const datasetId = this.generateUniqueId(); //!Change this
+
+  //     this.datasetUpload = true;
+
+  //     const totalFiles = dataset.length;
+
+  //     for (let i = 0; i < totalFiles; i++) {
+  //       const curData = dataset[i];
+  //       const status = await this.upload(curData, datasetId, orderId);
+  //       if (status != 201) {
+  //         if (callback) {
+  //           callback({
+  //             datasetId: datasetId,
+  //             error: "Dataset upload failed.",
+  //             progress: -1
+  //           });
+  //         }
+  //         throw new Error("File upload failed!");
+  //       }
+  //       if (callback) {
+  //         const filesUploaded = i + 1;
+  //         const progress = parseFloat(
+  //           ((filesUploaded / totalFiles) * 100).toFixed(2)
+  //         );
+
+  //         callback({
+  //           datasetId: datasetId,
+  //           progress: progress == 100.0 ? 100 : progress,
+  //           filesUploaded: filesUploaded
+  //         });
+  //       }
+  //       this.printProgressBar(i + 1, totalFiles);
+  //     }
+
+  //     return datasetId;
+  //   } catch (error) {
+  //     if (error.neuropacsError) {
+  //       throw new Error(error.neuropacsError);
+  //     } else {
+  //       throw new Error("Dataset upload failed!");
+  //     }
+  //   }
+  // }
+
+  async uploadPart(jsZip) {
+    // Generate the zip file as a Blob
+    const blob = await jsZip.generateAsync({ type: "uint8array" });
+    const form = {
+      "Content-Disposition": "form-data"
+      // filename: filename
+    };
+
+    const encoder = new TextEncoder();
+
+    const BOUNDARY = encoder.encode("neuropacs----------");
+    const DELIM = encoder.encode(";");
+    const CRLF = encoder.encode("\r\n");
+    const SEPARATOR = new Uint8Array([
+      ...encoder.encode("--"),
+      ...BOUNDARY,
+      ...CRLF
+    ]);
+    const END = new Uint8Array([
+      ...encoder.encode("--"),
+      ...BOUNDARY,
+      ...encoder.encode("--"),
+      ...CRLF
+    ]);
+    const CONTENT_TYPE = encoder.encode(
+      "Content-Type: application/octet-stream"
+    );
+
+    let header = SEPARATOR;
+
+    for (const [key, value] of Object.entries(form)) {
+      const formField = encoder.encode(`${key}: ${value}`);
+      header = new Uint8Array([...header, ...formField, ...DELIM]);
+    }
+    header = new Uint8Array([
+      ...header,
+      ...CRLF,
+      ...CONTENT_TYPE,
+      ...CRLF,
+      ...CRLF
+    ]);
+
+    const headerBytes = header;
+
+    const footerBytes = END;
+
+    const message = new Uint8Array([...headerBytes, ...blob, ...footerBytes]);
+
+    const partSize = 10 * 1024 * 1024; // 10 MB
+
+    const parts = message.length / partSize;
+  }
+
+  async newMultipartUpload(datasetId, orderId) {
+    const url = `${this.serverUrl}/api/multipartUploadRequest/`;
+
+    const encryptedOrderId = await this.encryptAesCtr(
+      orderId,
+      this.aesKey,
+      "string",
+      "string"
+    );
+
+    const headers = {
+      "Content-Type": "text/plain",
+      "Connection-Id": this.connectionId,
+      "Order-Id": encryptedOrderId,
+      Client: this.client,
+      "Dataset-Id": datasetId
+    };
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: headers
+    });
+
+    if (!response.ok) {
+      const jsonErr = JSON.parse(await response.text());
+      throw { neuropacsError: `${jsonErr.error}` };
+    }
+
+    const resText = await response.text();
+    const resJson = await this.decryptAesCtr(resText, this.aesKey, "JSON");
+
+    return resJson.uploadId;
+  }
+
+  async getMultipartPresignedUrl(datasetId, partNumber) {
+    if (orderId == null) {
+      orderId = this.orderId;
+    }
+
+    const url = `${this.serverUrl}/api/multipartPresignedUrl/`;
+
+    const encryptedOrderId = await this.encryptAesCtr(
+      orderId,
+      this.aesKey,
+      "string",
+      "string"
+    );
+
+    const headers = {
+      "Content-Type": "text/plain",
+      "Order-Id": encryptedOrderId,
+      "Connection-Id": this.connectionId,
+      Client: this.client
+    };
+
+    const body = {
+      datasetId: datasetId,
+      partNumber: partNumber
+    };
+
+    const encryptedBody = await this.encryptAesCtr(
+      body,
+      this.aesKey,
+      "JSON",
+      "string"
+    );
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: encryptedBody
+    });
+
+    if (!response.ok) {
+      const jsonErr = JSON.parse(await response.text());
+      throw { neuropacsError: `${jsonErr.error}` };
+    }
+
+    return response.body.uploadId;
+  }
+
+  splitBlob(blob, partSize) {
+    const parts = [];
+    let start = 0;
+    while (start < blob.size) {
+      const end = Math.min(start + partSize, blob.size);
+      parts.push(blob.slice(start, end));
+      start = end;
+    }
+    return parts;
+  }
+
+  async uploadPart(uploadId, datasetId, orderId, partNumber, partData) {
+    const encryptedOrderId = await this.encryptAesCtr(
+      orderId,
+      this.aesKey,
+      "string",
+      "string"
+    );
+
+    const headers = {
+      "Content-Type": "text/plain",
+      "connection-id": this.connectionId,
+      "Order-Id": encryptedOrderId,
+      client: this.client
+    };
+
+    const body = {
+      datasetId: datasetId,
+      uploadId: uploadId,
+      partNumber: partNumber
+    };
+
+    const encryptedBody = await this.encryptAesCtr(
+      body,
+      this.aesKey,
+      "JSON",
+      "string"
+    );
+
+    // let fail = false;
+    // let failText = "";
+    // for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(
+      `${this.serverUrl}/api/multipartPresignedUrl/`,
+      {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
       }
+    );
 
-      const datasetId = this.generateUniqueId(); //!Change this
+    if (!response.ok) {
+      const jsonErr = JSON.parse(await response.text());
+      throw { neuropacsError: `${jsonErr.error}` };
+    }
 
-      this.datasetUpload = true;
+    const resText = await response.text();
+    const resJson = await this.decryptAesCtr(resText, this.aesKey, "JSON");
 
-      const totalFiles = dataset.length;
+    const presignedUrl = resJson.presignedURL;
 
-      for (let i = 0; i < totalFiles; i++) {
-        const curData = dataset[i];
-        const status = await this.upload(curData, datasetId, orderId);
-        if (status != 201) {
-          if (callback) {
-            callback({
-              datasetId: datasetId,
-              error: "Dataset upload failed.",
-              progress: -1
-            });
-          }
-          throw new Error("File upload failed!");
-        }
-        if (callback) {
-          const filesUploaded = i + 1;
-          const progress = parseFloat(
-            ((filesUploaded / totalFiles) * 100).toFixed(2)
-          );
+    let fail = false;
+    let failText = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const upload_res = await fetch(presignedUrl, {
+        method: "PUT",
+        body: partData
+      });
 
-          callback({
-            datasetId: datasetId,
-            progress: progress == 100.0 ? 100 : progress,
-            filesUploaded: filesUploaded
-          });
-        }
-        this.printProgressBar(i + 1, totalFiles);
-      }
-
-      return datasetId;
-    } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
+      if (!upload_res.ok) {
+        fail = true;
+        failText = await upload_res.text();
       } else {
-        throw new Error("Dataset upload failed!");
+        const eTag = upload_res.headers.get("ETag");
+        return eTag;
       }
     }
+
+    if (fail) {
+      throw { neuropacsError: `${failText}` };
+    }
+  }
+
+  async completeMultipartUpload(orderId, datasetId, uploadId, uploadParts) {
+    const url = `${this.serverUrl}/api/completeMultipartUpload/`;
+
+    const encryptedOrderId = await this.encryptAesCtr(
+      orderId,
+      this.aesKey,
+      "string",
+      "string"
+    );
+
+    const headers = {
+      "Content-Type": "text/plain",
+      "Order-Id": encryptedOrderId,
+      "Connection-Id": this.connectionId,
+      Client: this.client
+    };
+
+    const body = {
+      datasetId: datasetId,
+      uploadId: uploadId,
+      uploadParts: uploadParts
+    };
+
+    const encryptedBody = await this.encryptAesCtr(
+      body,
+      this.aesKey,
+      "JSON",
+      "string"
+    );
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: encryptedBody
+    });
+
+    if (!response.ok) {
+      const jsonErr = JSON.parse(await response.text());
+      throw { neuropacsError: `${jsonErr.error}` };
+    }
+
+    return 200;
+  }
+
+  /**
+   * Fast upload dataset
+   * @param {Array<File>} dataset
+   * @param {String} datasetId Base64 datasetId (optional)
+   * @param {String} orderId Base64 orderId (optional)
+   * @param {Function} callback Callback for progress updates
+   * @returns {Number} Upload status code.
+   */
+  async uploadDataset(
+    dataset,
+    datasetId = null,
+    orderId = null,
+    callback = null
+  ) {
+    if (orderId == null) {
+      orderId = this.orderId;
+    }
+
+    if (datasetId == null) {
+      datasetId = this.generateUniqueId();
+    }
+
+    //load JSZip
+    await this.loadScript(
+      "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+    );
+
+    //get uploadID
+    const uploadId = await this.newMultipartUpload(datasetId, orderId);
+
+    let jsZip = new JSZip();
+    //!only accounts for File object types
+    //zip all file contents
+    for (let f = 0; f < dataset.length; f++) {
+      jsZip.file(dataset[f].name, dataset[f], { binary: true });
+      await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
+      if (callback) {
+        const fileProcessed = f + 1;
+        const progress = parseFloat(
+          ((fileProcessed / dataset.length) * 100).toFixed(2)
+        );
+        callback({
+          datasetId: datasetId,
+          progress: progress == 100.0 ? 100 : progress,
+          status: "Compressing"
+        });
+      }
+    }
+
+    //create a blob object for zip file contents
+    const blob = await jsZip.generateAsync({ type: "blob" });
+
+    const partSize = 5 * 1024 * 1024; // 5MB minimum part size
+
+    //split into partSize chunks
+    const blobParts = this.splitBlob(blob, partSize);
+
+    const finalParts = [];
+
+    for (let up = 0; up < blobParts.length; up++) {
+      //upload part
+      const ETag = await this.uploadPart(
+        uploadId,
+        datasetId,
+        orderId,
+        up + 1,
+        blobParts[up]
+      );
+      //puh to finalParts array
+      finalParts.push({ PartNumber: up + 1, ETag: ETag });
+      //invoke callback
+      if (callback) {
+        const filesUploaded = up + 1;
+        const progress = parseFloat(
+          ((filesUploaded / blobParts.length) * 100).toFixed(2)
+        );
+        callback({
+          datasetId: datasetId,
+          progress: progress == 100.0 ? 100 : progress,
+          status: "Uploading"
+        });
+      }
+    }
+
+    //complete multipart upload
+    const completeUpload = await this.completeMultipartUpload(
+      orderId,
+      datasetId,
+      uploadId,
+      finalParts
+    );
+
+    return datasetId; // Upload success status code
+    // return datasetId;
   }
 
   /**
@@ -650,7 +1047,6 @@ class Neuropacs {
     // wrappedData.set(headerBytes, 0);
     // wrappedData.set(binaryData, headerBytes.length);
     // wrappedData.set(footerBytes, headerBytes.length + data.length);
-    // console.log(wrappedData);
     const message = new Uint8Array([
       ...headerBytes,
       ...binaryData,

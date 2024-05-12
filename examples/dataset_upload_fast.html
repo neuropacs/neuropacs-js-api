@@ -24,7 +24,7 @@
 
           const apiKey = "m0ig54amrl87awtwlizcuji2bxacjm";
           const serverUrl =
-            "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/v1";
+            "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/v2";
           const productId = "PD/MSA/PSP-v1.0";
           const client = "API";
           const format = "XML";
@@ -45,7 +45,7 @@
 
             const datasetID = await npcs.uploadDataset(
               files,
-              "test1",
+              "test5_fast",
               orderID,
               (info) => {
                 console.log(info);

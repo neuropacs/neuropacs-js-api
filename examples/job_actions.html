@@ -12,9 +12,9 @@
   <body>
     <script>
       async function main() {
-        const apiKey = "m0ig54amrl87awtwlizcuji2bxacjn";
+        const apiKey = "m0ig54amrl87awtwlizcuji2bxacjm";
         const serverUrl =
-          "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
+          "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/v2";
         const productId = "PD/MSA/PSP-v1.0";
         const client = "API";
         const format = "XML";
@@ -46,13 +46,16 @@
         // );
         // console.log(valDat);
 
-        // // RUN A JOB
-        // const order = await npcs.runJob(
-        //   productId,
-        //   "yYX4MfQQeIWQXf5Ca4vu",
-        //   "rnxor3q9euor9r088x0mnl"
-        // );
-        // console.log(order);
+        // RUN A JOB
+        const order = await npcs.runJob(
+          productId,
+          "HgG5Xf39TpDSZlzQ4rUq",
+          "test5_fast"
+        );
+        console.log(order);
+
+        // const status = await npcs.getResults("TXT", "TEST", "TEST");
+        // console.log(status);
       }
       main();
     </script>
