@@ -1,0 +1,290 @@
+
+JavaScript SDK Unit Tests
+Test run date: 01-04-24-23-15-30
+    
+Test Description: Successfully retrieve public key.
+
+    Input:
+    null
+
+    Expected Output:
+    "Valid PEM formatted base64 encoded public key"
+
+    Actual Output:
+    "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvdnHTmzp7FWqli/JviR1\nfFDpsMbUenzNHzuahlLHANXIhenOfVwmBXZOJoR2+QwIoZIktrz6eGwk+MMX+1XW\nL8QZglsSdgwHTLLeuW3fgS4m4eGkLRhkytvD4KWNPw2Aiv/+BDUR1QIYfngLrkFS\nKy/3YOk+4SiYtkkRjzPf5p8Mi5mT7M9n7TNDfML6bL/APlGnULQnQmA0GRh8MHRl\n68U5nRNvtC087MM1nRLE1HOSyMFVpo6+xDNLkMLBvY2D1/5mssHX9RL22aG3rnd8\nhitTJaNLfOKN3NAldd/tMjluHLS0qOn4q+h6NEjJh3gscZ01dovk5QeXr197W+rG\nFwIDAQAB\n-----END PUBLIC KEY-----\n"
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully create a connection.
+
+    Input:
+    {"aesKey":"0Pq5pnqXC654dAvA57nV7A==","apiKey":"m0ig54amrl87awtwlizcuji2bxacjm"}
+
+    Expected Output:
+    "Connection object containing AES key, connection ID, and timestamp"
+
+    Actual Output:
+    {"timestamp":"2024-01-04 23:15:30 UTC","connectionId":"181169ed68cbba9eddf5efba3515f9a1","aesKey":"0Pq5pnqXC654dAvA57nV7A=="}
+
+----------------------------------------------------------------------
+    
+Test Description: Fail while creating a connection due to invalid API key.
+
+    Input:
+    {"aesKey":"zpuGUn39mhHZjEJwJK31rQ==","apiKey":"thisisnotarealapikey12345"}
+
+    Expected Output:
+    "Connection failed!"
+
+    Actual Output:
+    "Connection failed!"
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully create a new job and return an order ID.
+
+    Input:
+    {"connection-id":"2d2b9f69a45f4d84c9e7aa491c482296"}
+
+    Expected Output:
+    "Order ID (string, length 20, alphanumeric)"
+
+    Actual Output:
+    "j6AgjMVLyVz1R7i3Ej5C"
+
+----------------------------------------------------------------------
+    
+Test Description: Fail while creating a new job due to invalid connection ID.
+
+    Input:
+    {"connection-id":"thisisnotarealconnectionid12345"}
+
+    Expected Output:
+    "Job creation failed!"
+
+    Actual Output:
+    "Job creation failed!"
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully upload a file via File object.
+
+    Input:
+    "object"
+
+    Expected Output:
+    201
+
+    Actual Output:
+    201
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully upload a file via byte array (Uint8Array).
+
+    Input:
+    "object"
+
+    Expected Output:
+    201
+
+    Actual Output:
+    201
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully upload a dataset via array of File objects.
+
+    Input:
+    "object"
+
+    Expected Output:
+    201
+
+    Actual Output:
+    201
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully upload a dataset via Unit8Array.
+
+    Input:
+    "object"
+
+    Expected Output:
+    201
+
+    Actual Output:
+    201
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully run a job and return a status 202.
+
+    Input:
+    {"orderID":"ljKJG8hECJAFORJ9QKqz","productID":"PD/MSA/PSP-v1.0"}
+
+    Expected Output:
+    202
+
+    Actual Output:
+    202
+
+----------------------------------------------------------------------
+    
+Test Description: Fail running a job due to invalid product ID.
+
+    Input:
+    {"connection-id":"585ade4a2251d00613fc81bba66c9d3f","orderID":"LqWXYvtunHi0x01xIy9e","productID":"notARealProduct"}
+
+    Expected Output:
+    "Job run failed."
+
+    Actual Output:
+    "Job run failed."
+
+----------------------------------------------------------------------
+    
+Test Description: Fail running a job due to invalid order ID.
+
+    Input:
+    {"connection-id":"42f7d88e1b56acddceffdbef60525ae0","orderID":"notARealOrderID","productID":"PD/MSA/PSP-v1.0"}
+
+    Expected Output:
+    "Job run failed."
+
+    Actual Output:
+    "Job run failed."
+
+----------------------------------------------------------------------
+    
+Test Description: Fail running a job due to invalid connection ID.
+
+    Input:
+    {"connection-id":"notARealConnectionID","orderID":"zDfJUVCZ6d5cf0rtO31G","productID":"PD/MSA/PSP-v1.0"}
+
+    Expected Output:
+    "Job run failed."
+
+    Actual Output:
+    "Job run failed."
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully check status of job.
+
+    Input:
+    {"connection-id":"0330c23ed97c2120fb64dbe84fdbdb02","orderID":"TEST"}
+
+    Expected Output:
+    {"started":true,"finished":true,"failed":false,"progress":100,"info":"Finished"}
+
+    Actual Output:
+    {"started":true,"finished":true,"failed":false,"progress":100,"info":"Finished"}
+
+----------------------------------------------------------------------
+    
+Test Description: Fail checking job status due to invalid order ID.
+
+    Input:
+    {"connection-id":"c59f10fb3198c1507a7e6bff89cf8a48","orderID":"invalidOrderID"}
+
+    Expected Output:
+    "Status check failed."
+
+    Actual Output:
+    "Status check failed."
+
+----------------------------------------------------------------------
+    
+Test Description: Fail checking job status due to invalid connection ID.
+
+    Input:
+    {"connection-id":"noARealConnectionID","orderID":"TEST"}
+
+    Expected Output:
+    "Status check failed."
+
+    Actual Output:
+    "Status check failed."
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully retrieve job results in TXT format.
+
+    Input:
+    {"connection-id":"f7fb6160c87d34dd1baa2407fafc72ff","orderID":"TEST","format":"TXT"}
+
+    Expected Output:
+    "OrderID:TESTDate:2024-01-04Product:TESTPDprobabilityvs.MSA/PSP:62.6%MSAprobabilityvs.PSP:85.6%Biomarkerlevels:pSN=0.26,Putamen=0.19,SCP=0.48,MCP=0.07"
+
+    Actual Output:
+    "OrderID:TESTDate:2024-01-04Product:TESTPDprobabilityvs.MSA/PSP:62.6%MSAprobabilityvs.PSP:85.6%Biomarkerlevels:pSN=0.26,Putamen=0.19,SCP=0.48,MCP=0.07"
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully retrieve job results in JSON format.
+
+    Input:
+    {"connection-id":"6b8585d75abe14c8ae3d9fd395427fd2","orderID":"TEST","format":"JSON"}
+
+    Expected Output:
+    "{\"orderID\":\"TEST\",\"date\":\"2024-01-04\",\"product\":\"TEST\",\"result\":{\"PDprobability\":\"62.6\",\"MSAprobability\":\"85.6\",\"FWpSN\":\"0.26\",\"FWPutamen\":\"0.19\",\"FWSCP\":\"0.48\",\"FWMCP\":\"0.07\"}}"
+
+    Actual Output:
+    "{\"orderID\":\"TEST\",\"date\":\"2024-01-04\",\"product\":\"TEST\",\"result\":{\"PDprobability\":\"62.6\",\"MSAprobability\":\"85.6\",\"FWpSN\":\"0.26\",\"FWPutamen\":\"0.19\",\"FWSCP\":\"0.48\",\"FWMCP\":\"0.07\"}}"
+
+----------------------------------------------------------------------
+    
+Test Description: Successfully retrieve job results in XML format.
+
+    Input:
+    {"connection-id":"4ee852d54dd987cffef5119cf40f5eb3","orderID":"TEST","format":"XML"}
+
+    Expected Output:
+    "<?xmlversion=\"1.0\"encoding=\"UTF-8\"standalone=\"yes\"?><neuropacsorderID=\"TEST\"date=\"2024-01-04\"product=\"TEST\"><resultname=\"PDprobability\"value=\"62.6\"/><resultname=\"MSAprobability\"value=\"85.6\"/><dataname=\"FWpSN\"value=\"0.26\"/><dataname=\"FWPutamen\"value=\"0.19\"/><dataname=\"FWSCP\"value=\"0.48\"/><dataname=\"FWMCP\"value=\"0.07\"/></neuropacs>"
+
+    Actual Output:
+    "<?xmlversion=\"1.0\"encoding=\"UTF-8\"standalone=\"yes\"?><neuropacsorderID=\"TEST\"date=\"2024-01-04\"product=\"TEST\"><resultname=\"PDprobability\"value=\"62.6\"/><resultname=\"MSAprobability\"value=\"85.6\"/><dataname=\"FWpSN\"value=\"0.26\"/><dataname=\"FWPutamen\"value=\"0.19\"/><dataname=\"FWSCP\"value=\"0.48\"/><dataname=\"FWMCP\"value=\"0.07\"/></neuropacs>"
+
+----------------------------------------------------------------------
+    
+Test Description: Fail to check job status due to invalid result format.
+
+    Input:
+    {"connection-id":"852b1a834542358aadfb3f50c05463da","orderID":"TEST","format":"noARealFormat"}
+
+    Expected Output:
+    "Result retrieval failed!"
+
+    Actual Output:
+    "Result retrieval failed!"
+
+----------------------------------------------------------------------
+    
+Test Description: Fail to check job status due to invalid order ID.
+
+    Input:
+    {"orderID":"noARealOrderID","format":"TXT"}
+
+    Expected Output:
+    "Result retrieval failed!"
+
+    Actual Output:
+    "Result retrieval failed!"
+
+----------------------------------------------------------------------
+    
+Test Description: Fail to check job status due to invalid connection ID.
+
+    Input:
+    {"connection-id":"notARealConnectionID","orderID":"TEST","format":"TXT"}
+
+    Expected Output:
+    "Result retrieval failed!"
+
+    Actual Output:
+    "Result retrieval failed!"
+
+----------------------------------------------------------------------
+    
