@@ -12,366 +12,360 @@ class Neuropacs {
    * @param {String} client ClientID (default = "api")
    */
   constructor(serverUrl, apiKey, client = "api") {
-    /* PRIVATE METHODS (CLOSURES) */
-
-    /**
-     * Read in a file as an ArrayBuffer Object
-     * @param {File} file File to be read
-     * @returns ArrayBuffer contents of file
-     */
-    this.readFileAsArrayBuffer = async (file) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-      });
-    };
-
-    /**
-     * Print progress bar for dataset upload
-     * @param {*} current Current progress
-     * @param {*} total Total files to be uploaded
-     * @param {*} length Length of progress bar
-     */
-    this.printProgressBar = (current, total, length = 50) => {
-      const progress = (current / total) * 100;
-      const progressBar =
-        Array(Math.floor((current / total) * length))
-          .fill("=")
-          .join("") +
-        Array(length - Math.floor((current / total) * length))
-          .fill(".")
-          .join("");
-
-      console.clear();
-      console.log(`[${progressBar}] ${progress.toFixed(2)}%`);
-    };
-
-    /**
-     * Generate a random file name
-     * @returns 20 character random alphanumeric
-     */
-    this.generateFilename = () => {
-      const charset =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-      let result = "";
-      for (let i = 0; i < 20; i++) {
-        const randomIndex = Math.floor(Math.random() * charset.length);
-        result += charset.charAt(randomIndex);
-      }
-      return result;
-    };
-
-    /**
-     * Genereate unique ID for socket messages
-     */
-    this.generateUniqueId = () => {
-      return (
-        Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15)
-      );
-    };
-
-    /**
-     * Generate an 16-byte AES key for AES-CTR encryption.
-     * @returns AES key encoded as a base64 string.
-     */
-    this.generateAesKey = () => {
-      const aesKey = new Uint8Array(16);
-      window.crypto.getRandomValues(aesKey);
-      const aesKeyBase64 = btoa(String.fromCharCode.apply(null, aesKey));
-      return aesKeyBase64;
-    };
-
-    /**
-     * OAEP encrypt plaintext.
-     * @param {String/JSON} plaintext Plaintext to be encrypted.
-     * @returns Base64 string OAEP encrypted ciphertext.
-     */
-    this.oaepEncrypt = async (plaintext) => {
-      try {
-        // If plaintext is not a string, attempt to convert it to JSON
-        plaintext =
-          typeof plaintext === "string" ? plaintext : JSON.stringify(plaintext);
-      } catch (error) {
-        throw { neuropacsError: "Plaintext must be a string or JSON!" };
-      }
-
-      const publicKey = await this.getPublicKey();
-
-      // fetch the part of the PEM string between header and footer
-      const pemHeader = "-----BEGIN PUBLIC KEY-----";
-      const pemFooter = "-----END PUBLIC KEY-----";
-      const pemContents = publicKey.substring(
-        pemHeader.length,
-        publicKey.length - pemFooter.length - 1
-      );
-      // base64 decode the string to get the binary data
-      const binaryDerString = window.atob(pemContents);
-      // convert from a binary string to an ArrayBuffer
-      const publicKeyBuffer = this.str2ab(binaryDerString);
-
-      // Convert the public key to ArrayBuffer
-      // const publicKeyBuffer = new TextEncoder().encode(publicKey);
-      const publicKeyObject = await crypto.subtle.importKey(
-        "spki",
-        publicKeyBuffer,
-        {
-          name: "RSA-OAEP",
-          hash: "SHA-256"
-        },
-        true,
-        ["encrypt"]
-      );
-      // Encrypt the plaintext using OAEP padding
-      const ciphertextArrayBuffer = await crypto.subtle.encrypt(
-        {
-          name: "RSA-OAEP"
-        },
-        publicKeyObject,
-        new TextEncoder().encode(plaintext)
-      );
-
-      // Convert the ciphertext to Base64
-      const ciphertextBase64 = this.arrayBufferToBase64(ciphertextArrayBuffer);
-      return ciphertextBase64;
-    };
-
-    /**
-     * Retrieve public key from server.
-     * @returns {String} Base64 string public key.
-     */
-    this.getPublicKey = async () => {
-      try {
-        const response = await fetch(`${this.serverUrl}/api/getPubKey/`);
-
-        if (!response.ok) {
-          throw { neuropacsError: `${await response.text()}` };
-        }
-
-        const json = await response.json();
-        const pubKey = json.pub_key;
-        return pubKey;
-      } catch (error) {
-        if (error.neuropacsError) {
-          throw new Error(error.neuropacsError);
-        } else {
-          throw new Error("Failed to retrieve the public key.");
-        }
-      }
-    };
-
-    /**
-     * String to array buffer
-     * @param {*} str String to be converted
-     * @returns Array buffer
-     */
-    this.str2ab = (str) => {
-      const buf = new ArrayBuffer(str.length);
-      const bufView = new Uint8Array(buf);
-      for (let i = 0, strLen = str.length; i < strLen; i++) {
-        bufView[i] = str.charCodeAt(i);
-      }
-      return buf;
-    };
-
-    /**
-     * Convert array buffer to Base64
-     * @param {ArrayBuffer} buffer Array buffer to be converted
-     * @returns Base64 representation
-     */
-    this.arrayBufferToBase64 = (buffer) => {
-      const binary = new Uint8Array(buffer);
-      return btoa(String.fromCharCode.apply(null, binary));
-    };
-
-    /**
-     * AES CTR encrypt plaintext
-     * @param {JSON/String/Bytes} plaintext Plaintext to be encrypted.
-     * @param {String} aesKey Base64 AES key.
-     * @param {String} formatOut format of ciphertext. Defaults to "string".
-     * @returns {String} Encrypted ciphertext in requested format_out.
-     */
-    this.encryptAesCtr = async (plaintext, aesKey, formatIn, formatOut) => {
-      let plaintextBytes;
-
-      try {
-        if (formatIn == "string" && typeof plaintext === "string") {
-          plaintextBytes = new TextEncoder().encode(plaintext);
-        } else if (formatIn == "JSON") {
-          const plaintextJson = JSON.stringify(plaintext);
-          plaintextBytes = new TextEncoder().encode(plaintextJson);
-        } else if (
-          formatIn == "Uint8Array" &&
-          plaintext instanceof Uint8Array
-        ) {
-          plaintextBytes = plaintext;
-        } else {
-          throw new Error("Invalid plaintext format!");
-        }
-      } catch (e) {
-        if (error) {
-          throw new Error(error);
-        } else {
-          throw new Error("Plaintext decoding failed!");
-        }
-      }
-
-      try {
-        // Decode the base64-encoded AES key
-        const aesKeyBytes = new Uint8Array(
-          atob(aesKey)
-            .split("")
-            .map((c) => c.charCodeAt(0))
-        );
-
-        // Pad the plaintext
-        const paddedPlaintext = await this.pad(plaintextBytes, 16);
-
-        // Generate IV
-        const iv = crypto.getRandomValues(new Uint8Array(16));
-
-        // Import AES key
-        const importedKey = await crypto.subtle.importKey(
-          "raw",
-          aesKeyBytes,
-          { name: "AES-CTR" },
-          false,
-          ["encrypt"]
-        );
-
-        // Encrypt the plaintext using AES in CTR mode
-        const ciphertext = await crypto.subtle.encrypt(
-          {
-            name: "AES-CTR",
-            counter: iv,
-            length: 128
-          },
-          importedKey,
-          paddedPlaintext
-        );
-
-        // Combine IV and ciphertext
-        const encryptedData = new Uint8Array(iv.length + ciphertext.byteLength);
-        encryptedData.set(iv);
-        encryptedData.set(new Uint8Array(ciphertext), iv.length);
-
-        // Convert to base64 if the output format is 'string'
-        if (formatOut === "string") {
-          return btoa(String.fromCharCode.apply(null, encryptedData));
-        } else if (formatOut === "bytes") {
-          return encryptedData;
-        }
-      } catch (error) {
-        if (error) {
-          throw new Error(error);
-        } else {
-          throw new Error("AES encryption failed!");
-        }
-      }
-    };
-
-    /**
-     * Padding for AES CTR
-     * @param {*} data data to be padded
-     * @param {*} blockSize block size of cipher
-     * @returns  padded data
-     */
-    this.pad = async (data, blockSize) => {
-      const padding = blockSize - (data.length % blockSize);
-      const paddedData = new Uint8Array(data.length + padding);
-      paddedData.set(data);
-      return paddedData;
-    };
-
-    this.decryptAesCtr = async (encryptedData, aesKey, formatOut) => {
-      try {
-        // Decode the base64-encoded AES key
-        const aesKeyBytes = new Uint8Array(
-          atob(aesKey)
-            .split("")
-            .map((c) => c.charCodeAt(0))
-        );
-
-        // Convert the base64-encoded encrypted data to Uint8Array
-        const encryptedBytes = new Uint8Array(
-          atob(encryptedData)
-            .split("")
-            .map((c) => c.charCodeAt(0))
-        );
-
-        // Extract IV and ciphertext
-        const iv = encryptedBytes.slice(0, 16);
-        const ciphertext = encryptedBytes.slice(16);
-
-        // Import AES key
-        const importedKey = await crypto.subtle.importKey(
-          "raw",
-          aesKeyBytes,
-          { name: "AES-CTR" },
-          false,
-          ["decrypt"]
-        );
-
-        // Decrypt the ciphertext using AES in CTR mode
-        const decryptedBytes = await crypto.subtle.decrypt(
-          {
-            name: "AES-CTR",
-            counter: iv,
-            length: 128
-          },
-          importedKey,
-          ciphertext
-        );
-
-        // Convert the decrypted result to a string
-        let decryptedText = new TextDecoder().decode(decryptedBytes);
-
-        // Handle the output format
-        if (formatOut === "JSON") {
-          decryptedText = decryptedText.trim();
-          return JSON.parse(decryptedText);
-        } else if (formatOut === "string") {
-          return decryptedText;
-        }
-      } catch (error) {
-        if (error) {
-          throw new Error(error);
-        } else {
-          throw new Error("AES decryption failed!");
-        }
-      }
-    };
-
-    /**
-     * Generate a UTC time/date string
-     * @returns UTC time/date string
-     */
-    this.getTimeDateString = () => {
-      const currentDate = new Date();
-      const year = currentDate.getUTCFullYear();
-      const month = String(currentDate.getUTCMonth() + 1).padStart(2, "0");
-      const day = String(currentDate.getUTCDate()).padStart(2, "0");
-      const hours = String(currentDate.getUTCHours()).padStart(2, "0");
-      const minutes = String(currentDate.getUTCMinutes()).padStart(2, "0");
-      const seconds = String(currentDate.getUTCSeconds()).padStart(2, "0");
-      const formattedUTCDateTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
-      return formattedUTCDateTime;
-    };
-
-    /**
-     * Constructor
-     */
     this.apiKey = apiKey;
     this.serverUrl = serverUrl;
-    this.aesKey = this.generateAesKey();
+    this.aesKey = this.#generateAesKey();
     this.orderId = "";
     this.client = client;
     this.connectionId = "";
-    this.pendingMessages = {}; // Store pending messages awaiting response
     this.datasetUpload = false;
   }
+
+  /**
+   * Private methods
+   */
+  /**
+   * Read in a file as an ArrayBuffer Object
+   * @param {File} file File to be read
+   * @returns ArrayBuffer contents of file
+   */
+  #readFileAsArrayBuffer = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  /**
+   * Print progress bar for dataset upload
+   * @param {*} current Current progress
+   * @param {*} total Total files to be uploaded
+   * @param {*} length Length of progress bar
+   */
+  #printProgressBar = (current, total, length = 50) => {
+    const progress = (current / total) * 100;
+    const progressBar =
+      Array(Math.floor((current / total) * length))
+        .fill("=")
+        .join("") +
+      Array(length - Math.floor((current / total) * length))
+        .fill(".")
+        .join("");
+
+    console.clear();
+    console.log(`[${progressBar}] ${progress.toFixed(2)}%`);
+  };
+
+  /**
+   * Generate a random file name
+   * @returns 20 character random alphanumeric
+   */
+  #generateFilename = () => {
+    const charset =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let result = "";
+    for (let i = 0; i < 20; i++) {
+      const randomIndex = Math.floor(Math.random() * charset.length);
+      result += charset.charAt(randomIndex);
+    }
+    return result;
+  };
+
+  /**
+   * Genereate unique ID for socket messages
+   */
+  #generateUniqueId = () => {
+    return (
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15)
+    );
+  };
+
+  /**
+   * Generate an 16-byte AES key for AES-CTR encryption.
+   * @returns AES key encoded as a base64 string.
+   */
+  #generateAesKey = () => {
+    const aesKey = new Uint8Array(16);
+    window.crypto.getRandomValues(aesKey);
+    const aesKeyBase64 = btoa(String.fromCharCode.apply(null, aesKey));
+    return aesKeyBase64;
+  };
+
+  /**
+   * OAEP encrypt plaintext.
+   * @param {String/JSON} plaintext Plaintext to be encrypted.
+   * @returns Base64 string OAEP encrypted ciphertext.
+   */
+  #oaepEncrypt = async (plaintext) => {
+    try {
+      // If plaintext is not a string, attempt to convert it to JSON
+      plaintext =
+        typeof plaintext === "string" ? plaintext : JSON.stringify(plaintext);
+    } catch (error) {
+      throw { neuropacsError: "Plaintext must be a string or JSON!" };
+    }
+
+    const publicKey = await this.#getPublicKey();
+
+    // fetch the part of the PEM string between header and footer
+    const pemHeader = "-----BEGIN PUBLIC KEY-----";
+    const pemFooter = "-----END PUBLIC KEY-----";
+    const pemContents = publicKey.substring(
+      pemHeader.length,
+      publicKey.length - pemFooter.length - 1
+    );
+    // base64 decode the string to get the binary data
+    const binaryDerString = window.atob(pemContents);
+    // convert from a binary string to an ArrayBuffer
+    const publicKeyBuffer = this.#str2ab(binaryDerString);
+
+    // Convert the public key to ArrayBuffer
+    // const publicKeyBuffer = new TextEncoder().encode(publicKey);
+    const publicKeyObject = await crypto.subtle.importKey(
+      "spki",
+      publicKeyBuffer,
+      {
+        name: "RSA-OAEP",
+        hash: "SHA-256"
+      },
+      true,
+      ["encrypt"]
+    );
+    // Encrypt the plaintext using OAEP padding
+    const ciphertextArrayBuffer = await crypto.subtle.encrypt(
+      {
+        name: "RSA-OAEP"
+      },
+      publicKeyObject,
+      new TextEncoder().encode(plaintext)
+    );
+
+    // Convert the ciphertext to Base64
+    const ciphertextBase64 = this.#arrayBufferToBase64(ciphertextArrayBuffer);
+    return ciphertextBase64;
+  };
+
+  /**
+   * Retrieve public key from server.
+   * @returns {String} Base64 string public key.
+   */
+  #getPublicKey = async () => {
+    try {
+      const response = await fetch(`${this.serverUrl}/api/getPubKey/`);
+
+      if (!response.ok) {
+        throw { neuropacsError: `${await response.text()}` };
+      }
+
+      const json = await response.json();
+      const pubKey = json.pub_key;
+      return pubKey;
+    } catch (error) {
+      if (error.neuropacsError) {
+        throw new Error(error.neuropacsError);
+      } else {
+        throw new Error("Failed to retrieve the public key.");
+      }
+    }
+  };
+
+  /**
+   * String to array buffer
+   * @param {*} str String to be converted
+   * @returns Array buffer
+   */
+  #str2ab = (str) => {
+    const buf = new ArrayBuffer(str.length);
+    const bufView = new Uint8Array(buf);
+    for (let i = 0, strLen = str.length; i < strLen; i++) {
+      bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+  };
+
+  /**
+   * Convert array buffer to Base64
+   * @param {ArrayBuffer} buffer Array buffer to be converted
+   * @returns Base64 representation
+   */
+  #arrayBufferToBase64 = (buffer) => {
+    const binary = new Uint8Array(buffer);
+    return btoa(String.fromCharCode.apply(null, binary));
+  };
+
+  /**
+   * AES CTR encrypt plaintext
+   * @param {JSON/String/Bytes} plaintext Plaintext to be encrypted.
+   * @param {String} aesKey Base64 AES key.
+   * @param {String} formatOut format of ciphertext. Defaults to "string".
+   * @returns {String} Encrypted ciphertext in requested format_out.
+   */
+  #encryptAesCtr = async (plaintext, aesKey, formatIn, formatOut) => {
+    let plaintextBytes;
+
+    try {
+      if (formatIn == "string" && typeof plaintext === "string") {
+        plaintextBytes = new TextEncoder().encode(plaintext);
+      } else if (formatIn == "JSON") {
+        const plaintextJson = JSON.stringify(plaintext);
+        plaintextBytes = new TextEncoder().encode(plaintextJson);
+      } else if (formatIn == "Uint8Array" && plaintext instanceof Uint8Array) {
+        plaintextBytes = plaintext;
+      } else {
+        throw new Error("Invalid plaintext format!");
+      }
+    } catch (e) {
+      if (error) {
+        throw new Error(error);
+      } else {
+        throw new Error("Plaintext decoding failed!");
+      }
+    }
+
+    try {
+      // Decode the base64-encoded AES key
+      const aesKeyBytes = new Uint8Array(
+        atob(aesKey)
+          .split("")
+          .map((c) => c.charCodeAt(0))
+      );
+
+      // Pad the plaintext
+      const paddedPlaintext = await this.#pad(plaintextBytes, 16);
+
+      // Generate IV
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+
+      // Import AES key
+      const importedKey = await crypto.subtle.importKey(
+        "raw",
+        aesKeyBytes,
+        { name: "AES-CTR" },
+        false,
+        ["encrypt"]
+      );
+
+      // Encrypt the plaintext using AES in CTR mode
+      const ciphertext = await crypto.subtle.encrypt(
+        {
+          name: "AES-CTR",
+          counter: iv,
+          length: 128
+        },
+        importedKey,
+        paddedPlaintext
+      );
+
+      // Combine IV and ciphertext
+      const encryptedData = new Uint8Array(iv.length + ciphertext.byteLength);
+      encryptedData.set(iv);
+      encryptedData.set(new Uint8Array(ciphertext), iv.length);
+
+      // Convert to base64 if the output format is 'string'
+      if (formatOut === "string") {
+        return btoa(String.fromCharCode.apply(null, encryptedData));
+      } else if (formatOut === "bytes") {
+        return encryptedData;
+      }
+    } catch (error) {
+      if (error) {
+        throw new Error(error);
+      } else {
+        throw new Error("AES encryption failed!");
+      }
+    }
+  };
+
+  /**
+   * Padding for AES CTR
+   * @param {*} data data to be padded
+   * @param {*} blockSize block size of cipher
+   * @returns  padded data
+   */
+  #pad = async (data, blockSize) => {
+    const padding = blockSize - (data.length % blockSize);
+    const paddedData = new Uint8Array(data.length + padding);
+    paddedData.set(data);
+    return paddedData;
+  };
+
+  #decryptAesCtr = async (encryptedData, aesKey, formatOut) => {
+    try {
+      // Decode the base64-encoded AES key
+      const aesKeyBytes = new Uint8Array(
+        atob(aesKey)
+          .split("")
+          .map((c) => c.charCodeAt(0))
+      );
+
+      // Convert the base64-encoded encrypted data to Uint8Array
+      const encryptedBytes = new Uint8Array(
+        atob(encryptedData)
+          .split("")
+          .map((c) => c.charCodeAt(0))
+      );
+
+      // Extract IV and ciphertext
+      const iv = encryptedBytes.slice(0, 16);
+      const ciphertext = encryptedBytes.slice(16);
+
+      // Import AES key
+      const importedKey = await crypto.subtle.importKey(
+        "raw",
+        aesKeyBytes,
+        { name: "AES-CTR" },
+        false,
+        ["decrypt"]
+      );
+
+      // Decrypt the ciphertext using AES in CTR mode
+      const decryptedBytes = await crypto.subtle.decrypt(
+        {
+          name: "AES-CTR",
+          counter: iv,
+          length: 128
+        },
+        importedKey,
+        ciphertext
+      );
+
+      // Convert the decrypted result to a string
+      let decryptedText = new TextDecoder().decode(decryptedBytes);
+
+      // Handle the output format
+      if (formatOut === "JSON") {
+        decryptedText = decryptedText.trim();
+        return JSON.parse(decryptedText);
+      } else if (formatOut === "string") {
+        return decryptedText;
+      }
+    } catch (error) {
+      if (error) {
+        throw new Error(error);
+      } else {
+        throw new Error("AES decryption failed!");
+      }
+    }
+  };
+
+  /**
+   * Generate a UTC time/date string
+   * @returns UTC time/date string
+   */
+  #getTimeDateString = () => {
+    const currentDate = new Date();
+    const year = currentDate.getUTCFullYear();
+    const month = String(currentDate.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(currentDate.getUTCDate()).padStart(2, "0");
+    const hours = String(currentDate.getUTCHours()).padStart(2, "0");
+    const minutes = String(currentDate.getUTCMinutes()).padStart(2, "0");
+    const seconds = String(currentDate.getUTCSeconds()).padStart(2, "0");
+    const formattedUTCDateTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
+    return formattedUTCDateTime;
+  };
 
   /**
    * Init method
@@ -402,7 +396,7 @@ class Neuropacs {
     };
 
     try {
-      const encryptedBody = await this.oaepEncrypt(body);
+      const encryptedBody = await this.#oaepEncrypt(body);
 
       const response = await fetch(`${this.serverUrl}/api/connect/`, {
         method: "POST",
@@ -419,7 +413,7 @@ class Neuropacs {
       const connectionId = json.connectionID;
       this.connectionId = connectionId;
       return {
-        timestamp: this.getTimeDateString(),
+        timestamp: this.#getTimeDateString(),
         connectionId: connectionId,
         aesKey: this.aesKey
       };
@@ -457,7 +451,7 @@ class Neuropacs {
       }
 
       const text = await response.text();
-      const orderId = await this.decryptAesCtr(text, this.aesKey, "string");
+      const orderId = await this.#decryptAesCtr(text, this.aesKey, "string");
       this.orderId = orderId;
       return orderId;
     } catch (error) {
@@ -482,7 +476,7 @@ class Neuropacs {
         orderId = this.orderID;
       }
 
-      const datasetId = this.generateUniqueId(); //!Change this
+      const datasetId = this.#generateUniqueId();
 
       this.datasetUpload = true;
 
@@ -513,7 +507,7 @@ class Neuropacs {
             filesUploaded: filesUploaded
           });
         }
-        this.printProgressBar(i + 1, totalFiles);
+        this.#printProgressBar(i + 1, totalFiles);
       }
 
       return datasetId;
@@ -542,7 +536,7 @@ class Neuropacs {
     let filename = "";
 
     if (data instanceof Uint8Array) {
-      filename = this.generateFilename();
+      filename = this.#generateFilename();
     } else if (data instanceof File) {
       // Assuming 'data' is a File object or a string representing a file path
       const file = data instanceof File ? data : await this.readFile(data);
@@ -550,14 +544,14 @@ class Neuropacs {
       if (file.name) {
         filename = file.name;
       } else {
-        filename = this.generateFilename();
+        filename = this.#generateFilename();
       }
     } else {
       throw { neuropacsError: "Unsupported data type!" };
     }
 
     //encrypt order ID
-    const encryptedOrderId = await this.encryptAesCtr(
+    const encryptedOrderId = await this.#encryptAesCtr(
       orderId,
       this.aesKey,
       "string",
@@ -585,7 +579,7 @@ class Neuropacs {
 
     const s3ResText = await s3Res.text();
 
-    const s3Json = await this.decryptAesCtr(s3ResText, this.aesKey, "JSON");
+    const s3Json = await this.#decryptAesCtr(s3ResText, this.aesKey, "JSON");
 
     const presigned_url = s3Json["presignedURL"];
 
@@ -637,20 +631,12 @@ class Neuropacs {
     if (data instanceof Uint8Array) {
       binaryData = data;
     } else if (data instanceof File) {
-      const arrayBuff = await this.readFileAsArrayBuffer(data);
+      const arrayBuff = await this.#readFileAsArrayBuffer(data);
       binaryData = new Uint8Array(arrayBuff);
     } else {
       throw { neuropacsError: "Unsupported data type!" };
     }
 
-    // construct message
-    // const wrappedData = new Uint8Array(
-    //   headerBytes.length + binaryData.length + footerBytes.length
-    // );
-    // wrappedData.set(headerBytes, 0);
-    // wrappedData.set(binaryData, headerBytes.length);
-    // wrappedData.set(footerBytes, headerBytes.length + data.length);
-    // console.log(wrappedData);
     const message = new Uint8Array([
       ...headerBytes,
       ...binaryData,
@@ -670,6 +656,14 @@ class Neuropacs {
     return 201; // Upload success status code
   }
 
+  /**
+   * Validate uploaded dataset
+   * @param {*} fileArray Array of filenames
+   * @param {*} datasetId Base64 datasetId
+   * @param {*} orderId Base64 orderId
+   * @param {*} connectionId Base64 connectionId
+   * @returns
+   */
   async validateUpload(
     fileArray,
     datasetId,
@@ -684,7 +678,7 @@ class Neuropacs {
     }
     try {
       //encrypt order ID
-      const encryptedOrderId = await this.encryptAesCtr(
+      const encryptedOrderId = await this.#encryptAesCtr(
         orderId,
         this.aesKey,
         "string",
@@ -704,7 +698,7 @@ class Neuropacs {
         fileArray: fileArray
       };
 
-      const encryptedBody = await this.encryptAesCtr(
+      const encryptedBody = await this.#encryptAesCtr(
         body,
         this.aesKey,
         "JSON",
@@ -723,7 +717,7 @@ class Neuropacs {
       }
 
       const text = await response.text();
-      const decryptedDatasetValidation = await this.decryptAesCtr(
+      const decryptedDatasetValidation = await this.#decryptAesCtr(
         text,
         this.aesKey,
         "JSON"
@@ -737,14 +731,6 @@ class Neuropacs {
         throw new Error("Dataset validation failed!");
       }
     }
-  }
-
-  uint8ArrayToBase64(uint8Array) {
-    let binary = "";
-    uint8Array.forEach((byte) => {
-      binary += String.fromCharCode(byte);
-    });
-    return btoa(binary);
   }
 
   /**
@@ -774,7 +760,7 @@ class Neuropacs {
         datasetID: datasetId
       };
 
-      const encryptedBody = await this.encryptAesCtr(
+      const encryptedBody = await this.#encryptAesCtr(
         body,
         this.aesKey,
         "JSON",
@@ -827,7 +813,7 @@ class Neuropacs {
         datasetID: datasetId
       };
 
-      const encryptedBody = await this.encryptAesCtr(
+      const encryptedBody = await this.#encryptAesCtr(
         body,
         this.aesKey,
         "JSON",
@@ -846,7 +832,7 @@ class Neuropacs {
       }
 
       const text = await response.text();
-      const json = await this.decryptAesCtr(text, this.aesKey, "JSON");
+      const json = await this.#decryptAesCtr(text, this.aesKey, "JSON");
       return json;
     } catch (error) {
       if (error.neuropacsError) {
@@ -877,11 +863,11 @@ class Neuropacs {
         Client: this.client
       };
 
-      const validFormats = ["TXT", "XML", "JSON", "DCM", "PDF"];
+      const validFormats = ["TXT", "XML", "JSON"];
 
       if (!validFormats.includes(format)) {
         throw {
-          neuropacsError: `Invalid format! Valid formats include: "TXT", "JSON", "XML", "PDF", "DCM.`
+          neuropacsError: `Invalid format! Valid formats include: "TXT", "JSON", "XML".`
         };
       }
 
@@ -891,7 +877,7 @@ class Neuropacs {
         datasetID: datasetId
       };
 
-      const encryptedBody = await this.encryptAesCtr(
+      const encryptedBody = await this.#encryptAesCtr(
         body,
         this.aesKey,
         "JSON",
@@ -910,7 +896,7 @@ class Neuropacs {
       }
 
       const text = await response.text();
-      const decryptedFileData = await this.decryptAesCtr(
+      const decryptedFileData = await this.#decryptAesCtr(
         text,
         this.aesKey,
         "string"
