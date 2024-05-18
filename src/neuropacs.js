@@ -1,5 +1,5 @@
 /*!
- * NeuroPACS v1.1.0
+ * NeuroPACS v1.1.2
  * (c) 2024 Kerrick Cavanaugh
  * Released under the MIT License.
  */
@@ -37,12 +37,17 @@ class Neuropacs {
    */
 
   /**
-   * Genereate unique ID for socket messages
+   * Generate a unique V4 UUID
+   * @returns UUID V4 string
    */
-  #generateUniqueId = () => {
-    return (
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15)
+  #generateUniqueUUID = () => {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+      /[xy]/g,
+      function (c) {
+        const r = (Math.random() * 16) | 0,
+          v = c == "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }
     );
   };
 
@@ -59,7 +64,7 @@ class Neuropacs {
         resolve(); // Resolve the promise when the script is loaded
       };
       script.onerror = () => {
-        reject(new Error(`Script failed to load from ${url}`));
+        reject(new Error(`Script failed to load.`));
       };
 
       document.head.appendChild(script);
@@ -71,10 +76,14 @@ class Neuropacs {
    * @returns AES key encoded as a base64 string.
    */
   #generateAesKey = () => {
-    const aesKey = new Uint8Array(16);
-    window.crypto.getRandomValues(aesKey);
-    const aesKeyBase64 = btoa(String.fromCharCode.apply(null, aesKey));
-    return aesKeyBase64;
+    try {
+      const aesKey = new Uint8Array(16);
+      window.crypto.getRandomValues(aesKey);
+      const aesKeyBase64 = btoa(String.fromCharCode.apply(null, aesKey));
+      return aesKeyBase64;
+    } catch (error) {
+      throw new Error(`AES key generation failed: ${error.message || error}`);
+    }
   };
 
   /**
@@ -88,46 +97,50 @@ class Neuropacs {
       plaintext =
         typeof plaintext === "string" ? plaintext : JSON.stringify(plaintext);
     } catch (error) {
-      throw { neuropacsError: "Plaintext must be a string or JSON!" };
+      throw new RangeError("Plaintext must be a string or JSON.");
     }
 
-    const publicKey = await this.#getPublicKey();
+    try {
+      const publicKey = await this.#getPublicKey();
 
-    // fetch the part of the PEM string between header and footer
-    const pemHeader = "-----BEGIN PUBLIC KEY-----";
-    const pemFooter = "-----END PUBLIC KEY-----";
-    const pemContents = publicKey.substring(
-      pemHeader.length,
-      publicKey.length - pemFooter.length - 1
-    );
-    // base64 decode the string to get the binary data
-    const binaryDerString = window.atob(pemContents);
-    // convert from a binary string to an ArrayBuffer
-    const publicKeyBuffer = this.#str2ab(binaryDerString);
+      // fetch the part of the PEM string between header and footer
+      const pemHeader = "-----BEGIN PUBLIC KEY-----";
+      const pemFooter = "-----END PUBLIC KEY-----";
+      const pemContents = publicKey.substring(
+        pemHeader.length,
+        publicKey.length - pemFooter.length - 1
+      );
+      // base64 decode the string to get the binary data
+      const binaryDerString = window.atob(pemContents);
+      // convert from a binary string to an ArrayBuffer
+      const publicKeyBuffer = this.#str2ab(binaryDerString);
 
-    // Convert the public key to ArrayBuffer
-    const publicKeyObject = await crypto.subtle.importKey(
-      "spki",
-      publicKeyBuffer,
-      {
-        name: "RSA-OAEP",
-        hash: "SHA-256"
-      },
-      true,
-      ["encrypt"]
-    );
-    // Encrypt the plaintext using OAEP padding
-    const ciphertextArrayBuffer = await crypto.subtle.encrypt(
-      {
-        name: "RSA-OAEP"
-      },
-      publicKeyObject,
-      new TextEncoder().encode(plaintext)
-    );
+      // Convert the public key to ArrayBuffer
+      const publicKeyObject = await crypto.subtle.importKey(
+        "spki",
+        publicKeyBuffer,
+        {
+          name: "RSA-OAEP",
+          hash: "SHA-256"
+        },
+        true,
+        ["encrypt"]
+      );
+      // Encrypt the plaintext using OAEP padding
+      const ciphertextArrayBuffer = await crypto.subtle.encrypt(
+        {
+          name: "RSA-OAEP"
+        },
+        publicKeyObject,
+        new TextEncoder().encode(plaintext)
+      );
 
-    // Convert the ciphertext to Base64
-    const ciphertextBase64 = this.#arrayBufferToBase64(ciphertextArrayBuffer);
-    return ciphertextBase64;
+      // Convert the ciphertext to Base64
+      const ciphertextBase64 = this.#arrayBufferToBase64(ciphertextArrayBuffer);
+      return ciphertextBase64;
+    } catch (error) {
+      throw new Error(`OAEP encryption failed: ${error.message || error}`);
+    }
   };
 
   /**
@@ -139,19 +152,80 @@ class Neuropacs {
       const response = await fetch(`${this.serverUrl}/api/getPubKey/`);
 
       if (!response.ok) {
-        throw { neuropacsError: `${await response.text()}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const json = await response.json();
       const pubKey = json.pub_key;
       return pubKey;
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Failed to retrieve the public key.");
-      }
+      throw new Error(
+        `Retrieval of public key failed: ${error.message || error}`
+      );
     }
+  };
+
+  /**
+   * Validate dataset upload
+   * @param {Array<String>} fileNames Array of filenames
+   * @param {String} datasetId Base64 datasetId
+   * @param {String} orderId Base64 orderId
+   * @param {Number} zipIndex Index of dataset
+   * @param {Number} totalParts Total indexes
+   * @param {Number} interval Validation check time interval (in ms)
+   * @param {Number} numChecks Number of times to check
+   * @param {Function} callback Callback
+   * @returns
+   */
+  #validateDatasetOnInterval = async (
+    fileNames,
+    datasetId,
+    zipIndex,
+    totalParts,
+    orderId,
+    interval,
+    numChecks,
+    callback
+  ) => {
+    return new Promise((resolve, reject) => {
+      // Validate upload
+      if (callback) {
+        callback({
+          datasetId: datasetId,
+          progress: 0,
+          status: `Validating part ${parseInt(zipIndex) + 1}/${totalParts}`
+        });
+      }
+
+      let count = 0;
+      const intervalId = setInterval(async () => {
+        //validate Upload
+        const validateUpload = await this.validateUpload(
+          fileNames,
+          datasetId,
+          orderId,
+          this.connectionId
+        );
+
+        const missingFiles = validateUpload.missingFiles;
+
+        if (count >= numChecks) {
+          clearInterval(intervalId);
+          reject("Missing files: ", missingFiles);
+        } else {
+          if (missingFiles.length == 0) {
+            clearInterval(intervalId);
+            resolve([]);
+          }
+          count++;
+          callback({
+            datasetId: datasetId,
+            progress: parseFloat(((count / numChecks) * 100).toFixed(2)),
+            status: `Validating part ${parseInt(zipIndex) + 1}/${totalParts}`
+          });
+        }
+      }, interval);
+    });
   };
 
   /**
@@ -160,12 +234,18 @@ class Neuropacs {
    * @returns Array buffer
    */
   #str2ab = (str) => {
-    const buf = new ArrayBuffer(str.length);
-    const bufView = new Uint8Array(buf);
-    for (let i = 0, strLen = str.length; i < strLen; i++) {
-      bufView[i] = str.charCodeAt(i);
+    try {
+      const buf = new ArrayBuffer(str.length);
+      const bufView = new Uint8Array(buf);
+      for (let i = 0, strLen = str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+      }
+      return buf;
+    } catch (error) {
+      throw new Error(
+        `String to array buffer conversion failed: ${error.message || error}`
+      );
     }
-    return buf;
   };
 
   /**
@@ -174,8 +254,14 @@ class Neuropacs {
    * @returns Base64 representation
    */
   #arrayBufferToBase64 = (buffer) => {
-    const binary = new Uint8Array(buffer);
-    return btoa(String.fromCharCode.apply(null, binary));
+    try {
+      const binary = new Uint8Array(buffer);
+      return btoa(String.fromCharCode.apply(null, binary));
+    } catch (error) {
+      throw new Error(
+        `Array buffer to base64 conversion failed: ${error.message || error}`
+      );
+    }
   };
 
   /**
@@ -201,14 +287,18 @@ class Neuropacs {
    * @returns
    */
   #splitBlob = (blob, partSize) => {
-    const parts = [];
-    let start = 0;
-    while (start < blob.size) {
-      const end = Math.min(start + partSize, blob.size);
-      parts.push(blob.slice(start, end));
-      start = end;
+    try {
+      const parts = [];
+      let start = 0;
+      while (start < blob.size) {
+        const end = Math.min(start + partSize, blob.size);
+        parts.push(blob.slice(start, end));
+        start = end;
+      }
+      return parts;
+    } catch (error) {
+      throw new Error(`Partitioning blob failed: ${error.message || error}`);
     }
-    return parts;
   };
 
   /**
@@ -218,10 +308,14 @@ class Neuropacs {
    * @returns  padded data
    */
   #pad = async (data, blockSize) => {
-    const padding = blockSize - (data.length % blockSize);
-    const paddedData = new Uint8Array(data.length + padding);
-    paddedData.set(data);
-    return paddedData;
+    try {
+      const padding = blockSize - (data.length % blockSize);
+      const paddedData = new Uint8Array(data.length + padding);
+      paddedData.set(data);
+      return paddedData;
+    } catch (error) {
+      throw new Error(`AES padding failed : ${error.message || error}`);
+    }
   };
 
   /**
@@ -234,23 +328,15 @@ class Neuropacs {
   #encryptAesCtr = async (plaintext, aesKey, formatIn, formatOut) => {
     let plaintextBytes;
 
-    try {
-      if (formatIn == "string" && typeof plaintext === "string") {
-        plaintextBytes = new TextEncoder().encode(plaintext);
-      } else if (formatIn == "JSON") {
-        const plaintextJson = JSON.stringify(plaintext);
-        plaintextBytes = new TextEncoder().encode(plaintextJson);
-      } else if (formatIn == "Uint8Array" && plaintext instanceof Uint8Array) {
-        plaintextBytes = plaintext;
-      } else {
-        throw new Error("Invalid plaintext format!");
-      }
-    } catch (error) {
-      if (error) {
-        throw new Error(error);
-      } else {
-        throw new Error("Plaintext decoding failed!");
-      }
+    if (formatIn == "string" && typeof plaintext === "string") {
+      plaintextBytes = new TextEncoder().encode(plaintext);
+    } else if (formatIn == "JSON") {
+      const plaintextJson = JSON.stringify(plaintext);
+      plaintextBytes = new TextEncoder().encode(plaintextJson);
+    } else if (formatIn == "Uint8Array" && plaintext instanceof Uint8Array) {
+      plaintextBytes = plaintext;
+    } else {
+      throw new Error("Invalid plaintext format!");
     }
 
     try {
@@ -297,13 +383,11 @@ class Neuropacs {
         return btoa(String.fromCharCode.apply(null, encryptedData));
       } else if (formatOut === "bytes") {
         return encryptedData;
+      } else {
+        throw new Error(`Invalid output format`);
       }
     } catch (error) {
-      if (error) {
-        throw new Error(error);
-      } else {
-        throw new Error("AES encryption failed!");
-      }
+      throw new Error(`AES encrption failed: ${error.message || error}`);
     }
   };
 
@@ -364,60 +448,78 @@ class Neuropacs {
         return JSON.parse(decryptedText);
       } else if (formatOut === "string") {
         return decryptedText;
+      } else {
+        throw new Error(`Invalid output format`);
       }
     } catch (error) {
-      if (error) {
-        throw new Error(error);
-      } else {
-        throw new Error("AES decryption failed!");
-      }
+      throw new Error(`AES decryption failed: ${error.message || error}`);
     }
   };
 
   /**
    * Start new multipart upload
    * @param {*} datasetId Base64 datasetId
+   * @param {Number} zipIndex Index of zip file
    * @param {*} orderId Base64 orderId
    * @returns AWS UploadId
    */
-  #newMultipartUpload = async (datasetId, orderId) => {
-    const url = `${this.serverUrl}/api/multipartUploadRequest/`;
+  #newMultipartUpload = async (datasetId, index, orderId) => {
+    try {
+      const url = `${this.serverUrl}/api/multipartUploadRequest/`;
 
-    const encryptedOrderId = await this.#encryptAesCtr(
-      orderId,
-      this.aesKey,
-      "string",
-      "string"
-    );
+      const encryptedOrderId = await this.#encryptAesCtr(
+        orderId,
+        this.aesKey,
+        "string",
+        "string"
+      );
 
-    const headers = {
-      "Content-Type": "text/plain",
-      "Connection-Id": this.connectionId,
-      "Order-Id": encryptedOrderId,
-      Client: this.client,
-      "Dataset-Id": datasetId
-    };
+      const body = {
+        datasetId: datasetId,
+        zipIndex: index
+      };
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: headers
-    });
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
 
-    if (!response.ok) {
-      const jsonErr = JSON.parse(await response.text());
-      throw { neuropacsError: `${jsonErr.error}` };
+      const headers = {
+        "Content-Type": "text/plain",
+        "Connection-Id": this.connectionId,
+        "Order-Id": encryptedOrderId,
+        Client: this.client
+      };
+
+      const response = await fetch(url, {
+        method: "POST",
+        body: encryptedBody,
+        headers: headers
+      });
+
+      if (!response.ok) {
+        const jsonErr = JSON.parse(await response.text());
+        throw { neuropacsError: `${jsonErr.error}` };
+      }
+
+      const resText = await response.text();
+      const resJson = await this.#decryptAesCtr(resText, this.aesKey, "JSON");
+
+      return resJson.uploadId;
+    } catch (error) {
+      throw new Error(
+        `Multipart upload initialization failed: ${error.message || error}`
+      );
     }
-
-    const resText = await response.text();
-    const resJson = await this.#decryptAesCtr(resText, this.aesKey, "JSON");
-
-    return resJson.uploadId;
   };
 
   /**
    * Complete multipart upload
    * @param {String} orderId Base64 orderId
    * @param {String} datasetId Base64 datasetId
+   * @param {Number} zipIndex Index of zip file
    * @param {String} uploadId Base64 uploadId
    * @param {Object} uploadParts Uploaded parts object
    * @returns status code
@@ -425,127 +527,146 @@ class Neuropacs {
   #completeMultipartUpload = async (
     orderId,
     datasetId,
+    zipIndex,
     uploadId,
     uploadParts
   ) => {
-    const url = `${this.serverUrl}/api/completeMultipartUpload/`;
+    try {
+      const url = `${this.serverUrl}/api/completeMultipartUpload/`;
 
-    const encryptedOrderId = await this.#encryptAesCtr(
-      orderId,
-      this.aesKey,
-      "string",
-      "string"
-    );
+      const encryptedOrderId = await this.#encryptAesCtr(
+        orderId,
+        this.aesKey,
+        "string",
+        "string"
+      );
 
-    const headers = {
-      "Content-Type": "text/plain",
-      "Order-Id": encryptedOrderId,
-      "Connection-Id": this.connectionId,
-      Client: this.client
-    };
+      const headers = {
+        "Content-Type": "text/plain",
+        "Order-Id": encryptedOrderId,
+        "Connection-Id": this.connectionId,
+        Client: this.client
+      };
 
-    const body = {
-      datasetId: datasetId,
-      uploadId: uploadId,
-      uploadParts: uploadParts
-    };
+      const body = {
+        datasetId: datasetId,
+        uploadId: uploadId,
+        uploadParts: uploadParts,
+        zipIndex: zipIndex
+      };
 
-    const encryptedBody = await this.#encryptAesCtr(
-      body,
-      this.aesKey,
-      "JSON",
-      "string"
-    );
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: headers,
-      body: encryptedBody
-    });
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
 
-    if (!response.ok) {
-      const jsonErr = JSON.parse(await response.text());
-      throw { neuropacsError: `${jsonErr.error}` };
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
+      }
+
+      return 200;
+    } catch (error) {
+      throw new Error(
+        `Multipart upload completion failed: ${error.message || error}`
+      );
     }
-
-    return 200;
   };
 
   /**
    * Upload a part of the multipart upload
    * @param {String} uploadId Base64 uploadId
    * @param {String} datasetId Base64 datasetId
+   * @param {Number} zipIndex Index of zip file
    * @param {String} orderId Base64 orderId
    * @param {Number} partNumber Part number
    * @param {Bytes} partData Part data
    * @returns
    */
-  #uploadPart = async (uploadId, datasetId, orderId, partNumber, partData) => {
-    const encryptedOrderId = await this.#encryptAesCtr(
-      orderId,
-      this.aesKey,
-      "string",
-      "string"
-    );
+  #uploadPart = async (
+    uploadId,
+    datasetId,
+    index,
+    orderId,
+    partNumber,
+    partData
+  ) => {
+    try {
+      const encryptedOrderId = await this.#encryptAesCtr(
+        orderId,
+        this.aesKey,
+        "string",
+        "string"
+      );
 
-    const headers = {
-      "Content-Type": "text/plain",
-      "connection-id": this.connectionId,
-      "Order-Id": encryptedOrderId,
-      client: this.client
-    };
+      const headers = {
+        "Content-Type": "text/plain",
+        "connection-id": this.connectionId,
+        "Order-Id": encryptedOrderId,
+        client: this.client
+      };
 
-    const body = {
-      datasetId: datasetId,
-      uploadId: uploadId,
-      partNumber: partNumber
-    };
+      const body = {
+        datasetId: datasetId,
+        uploadId: uploadId,
+        partNumber: partNumber,
+        zipIndex: index
+      };
 
-    const encryptedBody = await this.#encryptAesCtr(
-      body,
-      this.aesKey,
-      "JSON",
-      "string"
-    );
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
 
-    const response = await fetch(
-      `${this.serverUrl}/api/multipartPresignedUrl/`,
-      {
-        method: "POST",
-        headers: headers,
-        body: encryptedBody
+      const response = await fetch(
+        `${this.serverUrl}/api/multipartPresignedUrl/`,
+        {
+          method: "POST",
+          headers: headers,
+          body: encryptedBody
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
       }
-    );
 
-    if (!response.ok) {
-      const jsonErr = JSON.parse(await response.text());
-      throw { neuropacsError: `${jsonErr.error}` };
-    }
+      const resText = await response.text();
+      const resJson = await this.#decryptAesCtr(resText, this.aesKey, "JSON");
 
-    const resText = await response.text();
-    const resJson = await this.#decryptAesCtr(resText, this.aesKey, "JSON");
+      const presignedUrl = resJson.presignedURL;
 
-    const presignedUrl = resJson.presignedURL;
+      let fail = false;
+      let failText = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const upload_res = await fetch(presignedUrl, {
+          method: "PUT",
+          body: partData
+        });
 
-    let fail = false;
-    let failText = "";
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const upload_res = await fetch(presignedUrl, {
-        method: "PUT",
-        body: partData
-      });
-
-      if (!upload_res.ok) {
-        fail = true;
-        failText = await upload_res.text();
-      } else {
-        const eTag = upload_res.headers.get("ETag");
-        return eTag;
+        if (!upload_res.ok) {
+          fail = true;
+          failText = await upload_res.text();
+        } else {
+          const eTag = upload_res.headers.get("ETag");
+          return eTag;
+        }
       }
-    }
 
-    if (fail) {
-      throw { neuropacsError: `${failText}` };
+      if (fail) {
+        throw new Error(`Upload failed after 3 attempts`);
+      }
+    } catch (e) {
+      throw new Error(`Upload part failed: ${error.message || error}`);
     }
   };
 
@@ -559,17 +680,17 @@ class Neuropacs {
    * @returns {String} Base64 string encrypted AES key
    */
   async connect() {
-    const headers = {
-      "Content-Type": "text/plain",
-      Client: this.client
-    };
-
-    const body = {
-      aes_key: this.aesKey,
-      api_key: this.apiKey
-    };
-
     try {
+      const headers = {
+        "Content-Type": "text/plain",
+        Client: this.client
+      };
+
+      const body = {
+        aes_key: this.aesKey,
+        api_key: this.apiKey
+      };
+
       const encryptedBody = await this.#oaepEncrypt(body);
 
       const response = await fetch(`${this.serverUrl}/api/connect/`, {
@@ -579,8 +700,7 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const json = await response.json();
@@ -592,11 +712,7 @@ class Neuropacs {
         aesKey: this.aesKey
       };
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Connection failed!");
-      }
+      throw new Error(`Connection creation failed: ${error.message || error}`);
     }
   }
 
@@ -620,8 +736,7 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const text = await response.text();
@@ -629,159 +744,186 @@ class Neuropacs {
       this.orderId = orderId;
       return orderId;
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Job creation failed!");
-      }
+      throw new Error(`Job creation failed: ${error.message || error}`);
     }
   }
-
-  // async uploadPart(jsZip) {
-  //   // Generate the zip file as a Blob
-  //   const blob = await jsZip.generateAsync({ type: "uint8array" });
-  //   const form = {
-  //     "Content-Disposition": "form-data"
-  //     // filename: filename
-  //   };
-
-  //   const encoder = new TextEncoder();
-
-  //   const BOUNDARY = encoder.encode("neuropacs----------");
-  //   const DELIM = encoder.encode(";");
-  //   const CRLF = encoder.encode("\r\n");
-  //   const SEPARATOR = new Uint8Array([
-  //     ...encoder.encode("--"),
-  //     ...BOUNDARY,
-  //     ...CRLF
-  //   ]);
-  //   const END = new Uint8Array([
-  //     ...encoder.encode("--"),
-  //     ...BOUNDARY,
-  //     ...encoder.encode("--"),
-  //     ...CRLF
-  //   ]);
-  //   const CONTENT_TYPE = encoder.encode(
-  //     "Content-Type: application/octet-stream"
-  //   );
-
-  //   let header = SEPARATOR;
-
-  //   for (const [key, value] of Object.entries(form)) {
-  //     const formField = encoder.encode(`${key}: ${value}`);
-  //     header = new Uint8Array([...header, ...formField, ...DELIM]);
-  //   }
-  //   header = new Uint8Array([
-  //     ...header,
-  //     ...CRLF,
-  //     ...CONTENT_TYPE,
-  //     ...CRLF,
-  //     ...CRLF
-  //   ]);
-
-  //   const headerBytes = header;
-
-  //   const footerBytes = END;
-
-  //   const message = new Uint8Array([...headerBytes, ...blob, ...footerBytes]);
-
-  //   const partSize = 10 * 1024 * 1024; // 10 MB
-
-  //   const parts = message.length / partSize;
-  // }
 
   /**
    * Fast upload dataset
    * @param {Array<File>} dataset Array of File objects
-   * @param {String} datasetId Base64 datasetId (optional)
    * @param {String} orderId Base64 orderId (optional)
+   * @param {String} datasetId Base64 datasetId (optional)
    * @param {Function} callback Callback for progress updates
    * @returns {Number} Upload status code.
    */
   async uploadDataset(
     dataset,
-    datasetId = null,
     orderId = null,
+    datasetId = null,
     callback = null
   ) {
-    if (orderId == null) {
-      orderId = this.orderId;
-    }
-
-    if (datasetId == null) {
-      datasetId = this.#generateUniqueId();
-    }
-
-    //load JSZip
-    await this.#loadScript(
-      "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
-    );
-
-    //get uploadID
-    const uploadId = await this.#newMultipartUpload(datasetId, orderId);
-
-    let jsZip = new JSZip();
-    //zip all file contents
-    for (let f = 0; f < dataset.length; f++) {
-      jsZip.file(dataset[f].name, dataset[f], { binary: true });
-      await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
-      if (callback) {
-        const fileProcessed = f + 1;
-        const progress = parseFloat(
-          ((fileProcessed / dataset.length) * 100).toFixed(2)
-        );
-        callback({
-          datasetId: datasetId,
-          progress: progress == 100.0 ? 100 : progress,
-          status: "Compressing"
-        });
+    try {
+      if (orderId == null) {
+        orderId = this.orderId;
       }
-    }
 
-    //create a blob object for zip file contents
-    const blob = await jsZip.generateAsync({ type: "blob" });
+      if (datasetId == null) {
+        datasetId = this.#generateUniqueUUID();
+      }
 
-    const partSize = 5 * 1024 * 1024; // 5MB minimum part size
-
-    //split into partSize chunks
-    const blobParts = this.#splitBlob(blob, partSize);
-
-    const finalParts = [];
-
-    for (let up = 0; up < blobParts.length; up++) {
-      //upload part
-      const ETag = await this.#uploadPart(
-        uploadId,
-        datasetId,
-        orderId,
-        up + 1,
-        blobParts[up]
+      //load JSZip
+      await this.#loadScript(
+        "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
       );
-      //puh to finalParts array
-      finalParts.push({ PartNumber: up + 1, ETag: ETag });
-      //invoke callback
-      if (callback) {
-        const filesUploaded = up + 1;
-        const progress = parseFloat(
-          ((filesUploaded / blobParts.length) * 100).toFixed(2)
-        );
-        callback({
-          datasetId: datasetId,
-          progress: progress == 100.0 ? 100 : progress,
-          status: "Uploading"
-        });
+
+      //collect file names in an array for upload validation
+      const fileNames = [];
+
+      const zipBuilderObject = {};
+
+      const maxZipSize = 250000000; //max size of zip file (25 MB)
+      let totalParts = 0; // Counts total parts the dataset is divided into
+      let curZipSize = 0; // Counts size of current zip file
+      let zipIndex = 0; // Counts index of zip file
+      for (let f = 0; f < dataset.length; f++) {
+        fileNames.push(dataset[f].name); // Append file to fileNames array for validation
+        curZipSize += dataset[f].size; // Increment current file set size
+        // Create array at zipIndex if does not already exist
+        if (!zipBuilderObject[zipIndex]) {
+          zipBuilderObject[zipIndex] = [];
+          totalParts++;
+        }
+        zipBuilderObject[zipIndex].push(dataset[f]); //push file to index
+        if (curZipSize >= maxZipSize) {
+          zipIndex++;
+          curZipSize = 0;
+        }
+        // Call callback for preprocessing
+        if (callback) {
+          const fileProcessed = f + 1;
+          const progress = parseFloat(
+            ((fileProcessed / dataset.length) * 100).toFixed(2)
+          );
+          callback({
+            datasetId: datasetId,
+            progress: progress == 100.0 ? 100 : progress,
+            status: "Preprocessing"
+          });
+        }
       }
+
+      let filesInSet = []; // Holds files for this 500MB chunk
+
+      for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
+        let jsZip = new JSZip(); // New JSZip instance
+
+        const uploadId = await this.#newMultipartUpload(
+          datasetId,
+          index,
+          orderId
+        ); // Get uploadID
+
+        for (let f = 0; f < fileArray.length; f++) {
+          filesInSet.push(fileArray[f].name);
+          jsZip.file(fileArray[f].name, fileArray[f], { binary: true });
+          await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
+          if (callback) {
+            const fileProcessed = f + 1;
+            const progress = parseFloat(
+              ((fileProcessed / fileArray.length) * 100).toFixed(2)
+            );
+            callback({
+              datasetId: datasetId,
+              progress: progress == 100.0 ? 100 : progress,
+              status: `Compressing part ${parseInt(index) + 1}/${totalParts}`
+            });
+          }
+        }
+
+        //create a blob object for zip file contents
+        const blob = await jsZip.generateAsync({ type: "blob" });
+        const partSize = 5 * 1024 * 1024; // 5MB minimum part size
+        //     //split into partSize chunks
+        const blobParts = this.#splitBlob(blob, partSize);
+        const finalParts = [];
+        for (let up = 0; up < blobParts.length; up++) {
+          //upload part
+          const ETag = await this.#uploadPart(
+            uploadId,
+            datasetId,
+            index,
+            orderId,
+            up + 1,
+            blobParts[up]
+          );
+          //push to finalParts array
+          finalParts.push({ PartNumber: up + 1, ETag: ETag });
+
+          if (callback) {
+            const fileProcessed = up + 1;
+            const progress = parseFloat(
+              ((fileProcessed / blobParts.length) * 100).toFixed(2)
+            );
+            callback({
+              datasetId: datasetId,
+              progress: progress == 100.0 ? 100 : progress,
+              status: `Uploading part ${parseInt(index) + 1}/${totalParts}`
+            });
+          }
+        }
+        //complete multipart upload
+        await this.#completeMultipartUpload(
+          orderId,
+          datasetId,
+          index,
+          uploadId,
+          finalParts
+        );
+
+        // invoke callback
+        if (callback) {
+          // const filesUploaded = up + 1;
+          const progress = parseFloat(
+            ((fileArray.length / dataset.length) * 100).toFixed(2)
+          );
+          callback({
+            datasetId: datasetId,
+            progress: progress == 100.0 ? 100 : progress,
+            status: `Uploading part ${parseInt(index) + 1}/${totalParts}`
+          });
+        }
+      }
+
+      let missingFiles = []; // Holds ALL missing files from validation
+
+      for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
+        const fileNames = fileArray.map((file) => file.name);
+        //checks upload for 20 intervals of 5 seconds
+        const validation = await this.#validateDatasetOnInterval(
+          fileNames,
+          datasetId,
+          index,
+          totalParts,
+          orderId,
+          1000, // 1 second
+          100 + (index + 1) * 2.5, // Scale amount of validation time based on chunk #
+          callback
+        );
+        missingFiles = [...missingFiles, ...validation]; // Compile all missing files
+      }
+
+      if (missingFiles.length == 0) {
+        return { datasetId: datasetId, state: "success" };
+      } else {
+        return {
+          datasetId: datasetId,
+          state: "failure",
+          missingFiles: missingFiles
+        };
+      }
+    } catch (error) {
+      throw new Error(`Dataset upload failed: ${error.message || error}`);
     }
-
-    //complete multipart upload
-    await this.#completeMultipartUpload(
-      orderId,
-      datasetId,
-      uploadId,
-      finalParts
-    );
-
-    return datasetId; // Upload success status code
   }
 
   /**
@@ -798,13 +940,13 @@ class Neuropacs {
     orderId = null,
     connectionId = null
   ) {
-    if (orderId == null) {
-      orderId = this.orderId;
-    }
-    if (connectionId == null) {
-      connectionId = this.connectionId;
-    }
     try {
+      if (orderId == null) {
+        orderId = this.orderId;
+      }
+      if (connectionId == null) {
+        connectionId = this.connectionId;
+      }
       //encrypt order ID
       const encryptedOrderId = await this.#encryptAesCtr(
         orderId,
@@ -840,8 +982,7 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const text = await response.text();
@@ -853,11 +994,7 @@ class Neuropacs {
 
       return decryptedDatasetValidation;
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Dataset validation failed!");
-      }
+      throw new Error(`Upload validation failed: ${error.message || error}`);
     }
   }
 
@@ -902,17 +1039,12 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       return response.status;
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Job run failed!");
-      }
+      throw new Error(`Job run failed: ${error.message || error}`);
     }
   }
 
@@ -924,11 +1056,10 @@ class Neuropacs {
    * @returns {Number} Job status message
    */
   async checkStatus(orderId = null, datasetId = null) {
-    if (orderId == null) {
-      orderId = this.orderId;
-    }
-
     try {
+      if (orderId == null) {
+        orderId = this.orderId;
+      }
       const url = `${this.serverUrl}/api/checkStatus/`;
       const headers = {
         "Content-Type": "text/plain",
@@ -955,19 +1086,14 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const text = await response.text();
       const json = await this.#decryptAesCtr(text, this.aesKey, "JSON");
       return json;
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Status check failed.");
-      }
+      throw new Error(`Check job status failed: ${error.message || error}`);
     }
   }
 
@@ -980,10 +1106,11 @@ class Neuropacs {
    * @returns  AES encrypted file data in specified format
    */
   async getResults(format, orderId = null, datasetId = null) {
-    if (orderId == null) {
-      orderId = this.orderId;
-    }
     try {
+      if (orderId == null) {
+        orderId = this.orderId;
+      }
+
       const url = `${this.serverUrl}/api/getResults/`;
       const headers = {
         "Content-Type": "text/plain",
@@ -1019,8 +1146,7 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const text = await response.text();
@@ -1032,13 +1158,8 @@ class Neuropacs {
 
       return decryptedFileData;
     } catch (error) {
-      if (error.neuropacsError) {
-        throw new Error(error.neuropacsError);
-      } else {
-        throw new Error("Result retrieval failed!");
-      }
+      throw new Error(`Check job status failed: ${error.message || error}`);
     }
   }
 }
-
 window.Neuropacs = Neuropacs;

@@ -23,7 +23,7 @@
 
         // CONNECT TO NEUROPACS
         const conn = await npcs.connect();
-        // console.log(conn);
+        console.log(conn);
 
         // const arr = [
         //   "woo_I0",
@@ -47,20 +47,23 @@
         // console.log(valDat);
 
         // RUN A JOB
-        const order = await npcs.runJob(
-          productId,
-          "gGO2upzaV9x7W94zH59V",
-          "unzipper-test13"
-        );
+        const order = await npcs.runJob(productId, "1232", "123");
         console.log(order);
 
-        const status = await npcs.checkStatus("TEST", "TEST");
-        console.log(status);
+        // const status = await npcs.checkStatus(
+        //   "bTvdOZfu6bxOLlTZQFIt",
+        //   "bTvdOZfu6bxOLlTZQFIt"
+        // );
+        // console.log(status);
 
-        const results = await npcs.getResults("TXT", "TEST", "TEST");
-        console.log(results);
+        // const results = await npcs.getResults(
+        //   "TXT",
+        //   "AUgmfovsLEryAohPj4Bz",
+        //   "AUgmfovsLEryAohPj4Bz"
+        // );
+        // console.log(results);
       }
-      // main();
+      main();
     </script>
   </body>
 </html>

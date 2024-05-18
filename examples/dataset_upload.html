@@ -43,14 +43,15 @@
             console.log(orderID);
             // upload_dataset(files); // Call the upload function with the selected files
 
+            // console.time("Upload time");
             const datasetID = await npcs.uploadDataset(
               files,
-              "slow-test-1",
               orderID,
               (info) => {
                 console.log(info);
               }
             );
+            // console.timeEnd("Upload time");
 
             // console.log(datasetID);
           } else {
