@@ -41,14 +41,18 @@ class Neuropacs {
    * @returns UUID V4 string
    */
   #generateUniqueUUID = () => {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-      /[xy]/g,
-      function (c) {
-        const r = (Math.random() * 16) | 0,
-          v = c == "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }
-    );
+    try {
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+        /[xy]/g,
+        function (c) {
+          const r = (Math.random() * 16) | 0,
+            v = c == "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        }
+      );
+    } catch (error) {
+      throw new Error(`UUID generation failed: ${error.message || error}`);
+    }
   };
 
   /**
@@ -166,8 +170,8 @@ class Neuropacs {
   };
 
   /**
-   * Validate dataset upload
-   * @param {Array<String>} fileNames Array of filenames
+   * Validate dataset upload on an interval
+   * @param {Array<Object>} fileMetadata Array of objects containing name and size of file
    * @param {String} datasetId Base64 datasetId
    * @param {String} orderId Base64 orderId
    * @param {Number} zipIndex Index of dataset
@@ -178,7 +182,7 @@ class Neuropacs {
    * @returns
    */
   #validateDatasetOnInterval = async (
-    fileNames,
+    fileMetadata,
     datasetId,
     zipIndex,
     totalParts,
@@ -201,7 +205,7 @@ class Neuropacs {
       const intervalId = setInterval(async () => {
         //validate Upload
         const validateUpload = await this.validateUpload(
-          fileNames,
+          fileMetadata,
           datasetId,
           orderId,
           this.connectionId
@@ -211,7 +215,8 @@ class Neuropacs {
 
         if (count >= numChecks) {
           clearInterval(intervalId);
-          reject("Missing files: ", missingFiles);
+          resolve(missingFiles);
+          // reject("Missing files: ", missingFiles.join());
         } else {
           if (missingFiles.length == 0) {
             clearInterval(intervalId);
@@ -671,98 +676,24 @@ class Neuropacs {
   };
 
   /**
-   * Public methods
-   */
-
-  /**
-   * Create a connection with the server
-
-   * @returns {String} Base64 string encrypted AES key
-   */
-  async connect() {
-    try {
-      const headers = {
-        "Content-Type": "text/plain",
-        Client: this.client
-      };
-
-      const body = {
-        aes_key: this.aesKey,
-        api_key: this.apiKey
-      };
-
-      const encryptedBody = await this.#oaepEncrypt(body);
-
-      const response = await fetch(`${this.serverUrl}/api/connect/`, {
-        method: "POST",
-        headers: headers,
-        body: encryptedBody
-      });
-
-      if (!response.ok) {
-        throw new Error(JSON.parse(await response.text()).error);
-      }
-
-      const json = await response.json();
-      const connectionId = json.connectionID;
-      this.connectionId = connectionId;
-      return {
-        timestamp: this.#getTimeDateString(),
-        connectionId: connectionId,
-        aesKey: this.aesKey
-      };
-    } catch (error) {
-      throw new Error(`Connection creation failed: ${error.message || error}`);
-    }
-  }
-
-  /**
-   * Create a new order
-
-   * @returns {String} Base64 string orderID.
-   */
-  async newJob() {
-    try {
-      const url = `${this.serverUrl}/api/newJob/`;
-      const headers = {
-        "Content-Type": "text/plain",
-        "Connection-Id": this.connectionId,
-        Client: this.client
-      };
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers
-      });
-
-      if (!response.ok) {
-        throw new Error(JSON.parse(await response.text()).error);
-      }
-
-      const text = await response.text();
-      const orderId = await this.#decryptAesCtr(text, this.aesKey, "string");
-      this.orderId = orderId;
-      return orderId;
-    } catch (error) {
-      throw new Error(`Job creation failed: ${error.message || error}`);
-    }
-  }
-
-  /**
-   * Fast upload dataset
-   * @param {Array<File>} dataset Array of File objects
+   * Attempt upload dataset
+   * @param {Array<File>} missingFiles Array of File objects missing from original uploadDataset
    * @param {String} orderId Base64 orderId (optional)
    * @param {String} datasetId Base64 datasetId (optional)
    * @param {Function} callback Callback for progress updates
    * @returns {Number} Upload status code.
    */
-  async uploadDataset(
+  #attemptUploadDataset = async (
     dataset,
     orderId = null,
     datasetId = null,
     callback = null
-  ) {
+  ) => {
     try {
+      if (!dataset instanceof FileList) {
+        throw new Error(`Dataset must be an array of files`);
+      }
+
       if (orderId == null) {
         orderId = this.orderId;
       }
@@ -776,17 +707,18 @@ class Neuropacs {
         "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
       );
 
-      //collect file names in an array for upload validation
-      const fileNames = [];
-
-      const zipBuilderObject = {};
+      const zipBuilderObject = {}; // Object of chunks, each value is an array of files
 
       const maxZipSize = 250000000; //max size of zip file (25 MB)
       let totalParts = 0; // Counts total parts the dataset is divided into
       let curZipSize = 0; // Counts size of current zip file
       let zipIndex = 0; // Counts index of zip file
       for (let f = 0; f < dataset.length; f++) {
-        fileNames.push(dataset[f].name); // Append file to fileNames array for validation
+        // Check if each object is a File
+        if (!dataset[f] instanceof File) {
+          throw new Error(`Not a file`);
+        }
+
         curZipSize += dataset[f].size; // Increment current file set size
         // Create array at zipIndex if does not already exist
         if (!zipBuilderObject[zipIndex]) {
@@ -894,33 +826,169 @@ class Neuropacs {
         }
       }
 
-      let missingFiles = []; // Holds ALL missing files from validation
+      let missingFiles = new DataTransfer(); // Holds ALL missing files from validation
 
       for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
-        const fileNames = fileArray.map((file) => file.name);
-        //checks upload for 20 intervals of 5 seconds
+        const fileMetadata = []; // Holds file names for validation
+        for (const file in fileArray) {
+          const fileObj = {
+            name: "",
+            size: 0,
+            file: null
+          };
+          fileObj.name = fileArray[file].name;
+          fileObj.size = fileArray[file].size;
+          // fileObj.file = fileArray[file];
+          fileMetadata.push(fileObj);
+        }
+        // Validates upload for 60 intervals of 1 second
         const validation = await this.#validateDatasetOnInterval(
-          fileNames,
+          fileMetadata,
           datasetId,
           index,
           totalParts,
           orderId,
-          1000, // 1 second
-          100 + (index + 1) * 2.5, // Scale amount of validation time based on chunk #
+          1 * 1000, // 1 second 1000
+          60, // 60 intervals 60
           callback
         );
-        missingFiles = [...missingFiles, ...validation]; // Compile all missing files
+
+        for (const mFile in validation) {
+          let result = fileArray.find(
+            (file) => file.name === validation[mFile]
+          );
+          missingFiles.items.add(result);
+        }
       }
 
-      if (missingFiles.length == 0) {
-        return { datasetId: datasetId, state: "success" };
-      } else {
-        return {
-          datasetId: datasetId,
-          state: "failure",
-          missingFiles: missingFiles
-        };
+      // Return missing files
+      return missingFiles.files;
+    } catch (error) {
+      throw new Error(
+        `Dataset upload attempt failed: ${error.message || error}`
+      );
+    }
+  };
+
+  /**
+   * Public methods
+   */
+
+  /**
+   * Create a connection with the server
+
+   * @returns {String} Base64 string encrypted AES key
+   */
+  async connect() {
+    try {
+      const headers = {
+        "Content-Type": "text/plain",
+        Client: this.client
+      };
+
+      const body = {
+        aes_key: this.aesKey,
+        api_key: this.apiKey
+      };
+
+      const encryptedBody = await this.#oaepEncrypt(body);
+
+      const response = await fetch(`${this.serverUrl}/api/connect/`, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
       }
+
+      const json = await response.json();
+      const connectionId = json.connectionID;
+      this.connectionId = connectionId;
+      return {
+        timestamp: this.#getTimeDateString(),
+        connectionId: connectionId,
+        aesKey: this.aesKey
+      };
+    } catch (error) {
+      throw new Error(`Connection creation failed: ${error.message || error}`);
+    }
+  }
+
+  /**
+   * Create a new order
+
+   * @returns {String} Base64 string orderID.
+   */
+  async newJob() {
+    try {
+      const url = `${this.serverUrl}/api/newJob/`;
+      const headers = {
+        "Content-Type": "text/plain",
+        "Connection-Id": this.connectionId,
+        Client: this.client
+      };
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers
+      });
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
+      }
+
+      const text = await response.text();
+      const orderId = await this.#decryptAesCtr(text, this.aesKey, "string");
+      this.orderId = orderId;
+      return orderId;
+    } catch (error) {
+      throw new Error(`Job creation failed: ${error.message || error}`);
+    }
+  }
+
+  /**
+   * Upload dataset
+   * @param {Array<File>} dataset Array of File objects
+   * @param {String} orderId Base64 orderId (optional)
+   * @param {String} datasetId Base64 datasetId (optional)
+   * @param {Function} callback Callback for progress updates
+   * @returns {Number} Upload status code.
+   */
+  async uploadDataset(
+    dataset,
+    orderId = null,
+    datasetId = null,
+    callback = null
+  ) {
+    try {
+      const missingFiles = await this.#attemptUploadDataset(
+        dataset,
+        orderId,
+        datasetId,
+        callback
+      );
+
+      if (missingFiles.length > 0) {
+        const finalMissingFiles = await this.#attemptUploadDataset(
+          missingFiles,
+          orderId,
+          datasetId,
+          callback
+        );
+
+        if (finalMissingFiles.length > 0) {
+          const finalMissingFilenames = [];
+          for (let f = 0; f < finalMissingFiles.length; f++) {
+            finalMissingFilenames.push(finalMissingFiles[f].name);
+          }
+          throw new Error(`Missing files: ${finalMissingFilenames.join()}`);
+        }
+      }
+
+      // Return success
+      return { datasetId: datasetId, state: "success" };
     } catch (error) {
       throw new Error(`Dataset upload failed: ${error.message || error}`);
     }
@@ -928,14 +996,14 @@ class Neuropacs {
 
   /**
    * Validate a dataset upload
-   * @param {Array<String>} fileArray Array of filenames
+   * @param {Object} fileMetadata Array of objects containing name and size of file
    * @param {*} datasetId  Base64 datasetId
    * @param {*} orderId Base64 orderId
    * @param {*} connectionId  Base64 connectionId
    * @returns
    */
   async validateUpload(
-    fileArray,
+    fileMetadata,
     datasetId,
     orderId = null,
     connectionId = null
@@ -965,7 +1033,7 @@ class Neuropacs {
       };
 
       const body = {
-        fileArray: fileArray
+        fileMetadata: fileMetadata
       };
 
       const encryptedBody = await this.#encryptAesCtr(
