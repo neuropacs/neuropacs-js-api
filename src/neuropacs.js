@@ -170,70 +170,6 @@ class Neuropacs {
   };
 
   /**
-   * Validate dataset upload on an interval
-   * @param {Array<Object>} fileMetadata Array of objects containing name and size of file
-   * @param {String} datasetId Base64 datasetId
-   * @param {String} orderId Base64 orderId
-   * @param {Number} zipIndex Index of dataset
-   * @param {Number} totalParts Total indexes
-   * @param {Number} interval Validation check time interval (in ms)
-   * @param {Number} numChecks Number of times to check
-   * @param {Function} callback Callback
-   * @returns
-   */
-  #validateDatasetOnInterval = async (
-    fileMetadata,
-    datasetId,
-    zipIndex,
-    totalParts,
-    orderId,
-    interval,
-    numChecks,
-    callback
-  ) => {
-    return new Promise((resolve, reject) => {
-      // Validate upload
-      if (callback) {
-        callback({
-          datasetId: datasetId,
-          progress: 0,
-          status: `Validating part ${parseInt(zipIndex) + 1}/${totalParts}`
-        });
-      }
-
-      let count = 0;
-      const intervalId = setInterval(async () => {
-        //validate Upload
-        const validateUpload = await this.validateUpload(
-          fileMetadata,
-          datasetId,
-          orderId,
-          this.connectionId
-        );
-
-        const missingFiles = validateUpload.missingFiles;
-
-        if (count >= numChecks) {
-          clearInterval(intervalId);
-          resolve(missingFiles);
-          // reject("Missing files: ", missingFiles.join());
-        } else {
-          if (missingFiles.length == 0) {
-            clearInterval(intervalId);
-            resolve([]);
-          }
-          count++;
-          callback({
-            datasetId: datasetId,
-            progress: parseFloat(((count / numChecks) * 100).toFixed(2)),
-            status: `Validating part ${parseInt(zipIndex) + 1}/${totalParts}`
-          });
-        }
-      }, interval);
-    });
-  };
-
-  /**
    * String to array buffer
    * @param {*} str String to be converted
    * @returns Array buffer
@@ -304,6 +240,25 @@ class Neuropacs {
     } catch (error) {
       throw new Error(`Partitioning blob failed: ${error.message || error}`);
     }
+  };
+
+  /**
+   * Split array into partSize pieces for processing
+   * @param {*} array Array
+   * @param {*} partSize Part size
+   * @returns
+   */
+  #splitArray = (array, partSize) => {
+    if (partSize <= 0) {
+      throw new Error("Chunk size must be greater than 0");
+    }
+
+    const result = [];
+    for (let i = 0; i < array.length; i += partSize) {
+      const chunk = array.slice(i, i + partSize);
+      result.push(chunk);
+    }
+    return result;
   };
 
   /**
@@ -690,6 +645,10 @@ class Neuropacs {
     callback = null
   ) => {
     try {
+      /**
+       * DATASET UPLOAD
+       */
+
       if (!dataset instanceof FileList) {
         throw new Error(`Dataset must be an array of files`);
       }
@@ -825,44 +784,7 @@ class Neuropacs {
           });
         }
       }
-
-      let missingFiles = new DataTransfer(); // Holds ALL missing files from validation
-
-      for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
-        const fileMetadata = []; // Holds file names for validation
-        for (const file in fileArray) {
-          const fileObj = {
-            name: "",
-            size: 0,
-            file: null
-          };
-          fileObj.name = fileArray[file].name;
-          fileObj.size = fileArray[file].size;
-          // fileObj.file = fileArray[file];
-          fileMetadata.push(fileObj);
-        }
-        // Validates upload for 60 intervals of 1 second
-        const validation = await this.#validateDatasetOnInterval(
-          fileMetadata,
-          datasetId,
-          index,
-          totalParts,
-          orderId,
-          1 * 1000, // 1 second 1000
-          60, // 60 intervals 60
-          callback
-        );
-
-        for (const mFile in validation) {
-          let result = fileArray.find(
-            (file) => file.name === validation[mFile]
-          );
-          missingFiles.items.add(result);
-        }
-      }
-
-      // Return missing files
-      return missingFiles.files;
+      return 201;
     } catch (error) {
       throw new Error(
         `Dataset upload attempt failed: ${error.message || error}`
@@ -963,29 +885,7 @@ class Neuropacs {
     callback = null
   ) {
     try {
-      const missingFiles = await this.#attemptUploadDataset(
-        dataset,
-        orderId,
-        datasetId,
-        callback
-      );
-
-      if (missingFiles.length > 0) {
-        const finalMissingFiles = await this.#attemptUploadDataset(
-          missingFiles,
-          orderId,
-          datasetId,
-          callback
-        );
-
-        if (finalMissingFiles.length > 0) {
-          const finalMissingFilenames = [];
-          for (let f = 0; f < finalMissingFiles.length; f++) {
-            finalMissingFilenames.push(finalMissingFiles[f].name);
-          }
-          throw new Error(`Missing files: ${finalMissingFilenames.join()}`);
-        }
-      }
+      await this.#attemptUploadDataset(dataset, orderId, datasetId, callback);
 
       // Return success
       return { datasetId: datasetId, state: "success" };
@@ -996,17 +896,19 @@ class Neuropacs {
 
   /**
    * Validate a dataset upload
-   * @param {Object} fileMetadata Array of objects containing name and size of file
+   * @param {Object} files Array of File objects
    * @param {*} datasetId  Base64 datasetId
    * @param {*} orderId Base64 orderId
    * @param {*} connectionId  Base64 connectionId
+   * @param {*} callback Callback
    * @returns
    */
   async validateUpload(
-    fileMetadata,
+    files,
     datasetId,
     orderId = null,
-    connectionId = null
+    connectionId = null,
+    callback
   ) {
     try {
       if (orderId == null) {
@@ -1015,6 +917,13 @@ class Neuropacs {
       if (connectionId == null) {
         connectionId = this.connectionId;
       }
+
+      const fileList = [];
+
+      for (let i = 0; i < files.length; i++) {
+        fileList.push({ name: files[i].name, size: files[i].size });
+      }
+
       //encrypt order ID
       const encryptedOrderId = await this.#encryptAesCtr(
         orderId,
@@ -1022,6 +931,20 @@ class Neuropacs {
         "string",
         "string"
       );
+
+      const validationParts = this.#splitArray(fileList, 100);
+
+      if (callback) {
+        const filesValidated = 0;
+        const progress = parseFloat(
+          ((filesValidated / files.length) * 100).toFixed(2)
+        );
+        callback({
+          datasetId: datasetId,
+          progress: progress == 100.0 ? 100 : progress,
+          status: "Validating"
+        });
+      }
 
       const url = `${this.serverUrl}/api/verifyUpload/`;
       const headers = {
@@ -1032,35 +955,59 @@ class Neuropacs {
         Client: this.client
       };
 
-      const body = {
-        fileMetadata: fileMetadata
-      };
+      let totalValidated = 0;
 
-      const encryptedBody = await this.#encryptAesCtr(
-        body,
-        this.aesKey,
-        "JSON",
-        "string"
-      );
+      let totalMissingFiles = [];
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: encryptedBody
-      });
+      for (let val = 0; val < validationParts.length; val++) {
+        const body = {
+          fileMetadata: validationParts[val]
+        };
 
-      if (!response.ok) {
-        throw new Error(JSON.parse(await response.text()).error);
+        const encryptedBody = await this.#encryptAesCtr(
+          body,
+          this.aesKey,
+          "JSON",
+          "string"
+        );
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: headers,
+          body: encryptedBody
+        });
+
+        if (!response.ok) {
+          throw new Error(JSON.parse(await response.text()).error);
+        }
+
+        const text = await response.text();
+
+        const decryptedDatasetValidation = await this.#decryptAesCtr(
+          text,
+          this.aesKey,
+          "JSON"
+        );
+
+        totalMissingFiles = totalMissingFiles.concat(
+          decryptedDatasetValidation.missingFiles
+        );
+
+        totalValidated += validationParts[val].length;
+
+        if (callback) {
+          const filesValidated = totalValidated;
+          const progress = parseFloat(
+            ((filesValidated / files.length) * 100).toFixed(2)
+          );
+          callback({
+            datasetId: datasetId,
+            progress: progress == 100.0 ? 100 : progress,
+            status: "Validating"
+          });
+        }
       }
-
-      const text = await response.text();
-      const decryptedDatasetValidation = await this.#decryptAesCtr(
-        text,
-        this.aesKey,
-        "JSON"
-      );
-
-      return decryptedDatasetValidation;
+      return { missingFiles: totalMissingFiles };
     } catch (error) {
       throw new Error(`Upload validation failed: ${error.message || error}`);
     }

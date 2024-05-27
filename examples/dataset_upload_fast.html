@@ -31,11 +31,11 @@
 
           const files = document.getElementById("imageFiles").files;
 
-          const fileList = [];
+          // const fileList = [];
 
-          for (let i = 0; i < files.length; i++) {
-            fileList.push(files[i].name);
-          }
+          // for (let i = 0; i < files.length; i++) {
+          //   fileList.push({ name: files[i].name, size: files[i].size });
+          // }
 
           // console.log(fileList);
 
@@ -46,26 +46,27 @@
             console.log(conn);
             // CREATE A NEW JOB
             // const orderID = await npcs.newJob();
-            // console.log(orderID);
-            // upload_dataset(files); // Call the upload function with the selected files
             // console.time("Upload time");
-            const datasetID = await npcs.uploadDataset(
-              files,
-              "aefed6ce-ab12-4bc2-a955-4641513f903d",
-              "aefed6ce-ab12-4bc2-a955-4641513f903d",
-              (info) => {
-                console.log(info);
-              }
-            );
-            console.log(datasetID);
+            // const datasetID = await npcs.uploadDataset(
+            //   files,
+            //   orderID,
+            //   orderID,
+            //   (info) => {
+            //     console.log(info);
+            //   }
+            // );
             // console.timeEnd("Upload time");
 
-            // const verifyUpload = await npcs.validateUpload(
-            //   fileList,
-            //   "v2-test40",
-            //   "TEST"
-            // );
-            // console.log(verifyUpload);
+            const verifyUpload = await npcs.validateUpload(
+              files,
+              "db7058bd-6b90-45eb-b671-be2d9082bed3",
+              "db7058bd-6b90-45eb-b671-be2d9082bed3",
+              null,
+              (val) => {
+                console.log(val);
+              }
+            );
+            console.log(verifyUpload);
 
             // console.log(datasetID);
           } else {
