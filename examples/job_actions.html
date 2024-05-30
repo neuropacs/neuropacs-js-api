@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
 
     <!-- NeuroPACS SDK -->
-    <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_3.min.js"></script>
-    <!-- <script src="../src/neuropacs.min.js"></script> -->
+    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_3.min.js"></script> -->
+    <script src="../src/neuropacs.js"></script>
 
     <title>NeuroPACS SDK Job Actions Example</title>
   </head>
@@ -19,7 +19,7 @@
         const client = "API";
         const format = "XML";
 
-        const npcs = Neuropacs.init(serverUrl, apiKey);
+        const npcs = Neuropacs.init({ serverUrl: serverUrl, apiKey: apiKey });
 
         // CONNECT TO NEUROPACS
         const conn = await npcs.connect();
@@ -54,17 +54,17 @@
         // );
         // console.log(order);
 
-        const status = await npcs.checkStatus(
-          "db7058bd-6b90-45eb-b671-be2d9082bed3",
-          "db7058bd-6b90-45eb-b671-be2d9082bed3"
-        );
+        const status = await npcs.checkStatus({
+          orderId: "db7058bd-6b90-45eb-b671-be2d9082bed3",
+          datasetId: "db7058bd-6b90-45eb-b671-be2d9082bed3"
+        });
         console.log(status);
 
-        const results = await npcs.getResults(
-          "TXT",
-          "db7058bd-6b90-45eb-b671-be2d9082bed3",
-          "db7058bd-6b90-45eb-b671-be2d9082bed3"
-        );
+        const results = await npcs.getResults({
+          format: "TXT",
+          orderId: "db7058bd-6b90-45eb-b671-be2d9082bed3",
+          datasetId: "db7058bd-6b90-45eb-b671-be2d9082bed3"
+        });
         console.log(results);
       }
       main();

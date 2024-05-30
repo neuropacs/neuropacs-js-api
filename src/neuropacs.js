@@ -1,5 +1,5 @@
 /*!
- * NeuroPACS v1.1.3
+ * NeuroPACS v1.1.4
  * (c) 2024 Kerrick Cavanaugh
  * Released under the MIT License.
  */
@@ -24,11 +24,11 @@ class Neuropacs {
    * Init method
    * @param {String} serverUrl URL of server
    * @param {String} apiKey API key
-   * @param {String} client ClientID (default = 'api')
+   * @param {String} client client id (default = 'api')
 
    * @returns {Neuropacs} instance
    */
-  static init(serverUrl, apiKey, client = "api") {
+  static init({ serverUrl, apiKey, client = "api" }) {
     return new Neuropacs(serverUrl, apiKey, client);
   }
 
@@ -891,13 +891,14 @@ class Neuropacs {
 
   /**
    * Validate a dataset upload
-   * @param {Object} files Array of File objects
-   * @param {*} datasetId  Base64 datasetId
-   * @param {*} orderId Base64 orderId
-   * @param {*} callback Callback
-   * @returns
+   * @param {Array[Files]} dataset Array of File objects
+   * @param {String} datasetId  Base64 datasetId
+   * @param {String} orderId Base64 orderId
+   * @param {Function} callback Callback
+   
+   * @returns {Array} Array of missing files
    */
-  async validateUpload({ files, datasetId, orderId = null, callback }) {
+  async validateUpload({ dataset, datasetId, orderId = null, callback }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
@@ -905,8 +906,8 @@ class Neuropacs {
 
       const fileList = [];
 
-      for (let i = 0; i < files.length; i++) {
-        fileList.push({ name: files[i].name, size: files[i].size });
+      for (let i = 0; i < dataset.length; i++) {
+        fileList.push({ name: dataset[i].name, size: dataset[i].size });
       }
 
       //encrypt order ID
@@ -922,7 +923,7 @@ class Neuropacs {
       if (callback) {
         const filesValidated = 0;
         const progress = parseFloat(
-          ((filesValidated / files.length) * 100).toFixed(2)
+          ((filesValidated / dataset.length) * 100).toFixed(2)
         );
         callback({
           datasetId: datasetId,
@@ -983,7 +984,7 @@ class Neuropacs {
         if (callback) {
           const filesValidated = totalValidated;
           const progress = parseFloat(
-            ((filesValidated / files.length) * 100).toFixed(2)
+            ((filesValidated / dataset.length) * 100).toFixed(2)
           );
           callback({
             datasetId: datasetId,
