@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
 
     <!-- NeuroPACS SDK -->
-    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_2.min.js"></script> -->
-    <script src="../src/neuropacs.js"></script>
+    <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_3.min.js"></script>
+    <!-- <script src="../src/neuropacs.js"></script> -->
 
     <title>NeuroPACS SDK Dataset Upload Example</title>
   </head>
@@ -45,28 +45,28 @@
             const conn = await npcs.connect();
             console.log(conn);
             // CREATE A NEW JOB
-            // const orderID = await npcs.newJob();
-            // console.time("Upload time");
-            // const datasetID = await npcs.uploadDataset(
-            //   files,
-            //   orderID,
-            //   orderID,
-            //   (info) => {
-            //     console.log(info);
-            //   }
-            // );
-            // console.timeEnd("Upload time");
-
-            const verifyUpload = await npcs.validateUpload(
+            const orderID = await npcs.newJob();
+            console.time("Upload time");
+            const datasetID = await npcs.uploadDataset(
               files,
-              "db7058bd-6b90-45eb-b671-be2d9082bed3",
-              "db7058bd-6b90-45eb-b671-be2d9082bed3",
-              null,
-              (val) => {
-                console.log(val);
+              orderID,
+              orderID,
+              (info) => {
+                console.log(info);
               }
             );
-            console.log(verifyUpload);
+            console.timeEnd("Upload time");
+
+            // const verifyUpload = await npcs.validateUpload(
+            //   files,
+            //   "db7058bd-6b90-45eb-b671-be2d9082bed3",
+            //   "db7058bd-6b90-45eb-b671-be2d9082bed3",
+            //   null,
+            //   (val) => {
+            //     console.log(val);
+            //   }
+            // );
+            // console.log(verifyUpload);
 
             // console.log(datasetID);
           } else {

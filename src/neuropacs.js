@@ -878,15 +878,10 @@ class Neuropacs {
    * @param {Function} callback Callback for progress updates
    * @returns {Number} Upload status code.
    */
-  async uploadDataset(
-    dataset,
-    orderId = null,
-    datasetId = null,
-    callback = null
-  ) {
+  async uploadDataset({ dataset, orderId = null, datasetId = null, callback }) {
     try {
+      // Attempt upload
       await this.#attemptUploadDataset(dataset, orderId, datasetId, callback);
-
       // Return success
       return { datasetId: datasetId, state: "success" };
     } catch (error) {
@@ -899,23 +894,13 @@ class Neuropacs {
    * @param {Object} files Array of File objects
    * @param {*} datasetId  Base64 datasetId
    * @param {*} orderId Base64 orderId
-   * @param {*} connectionId  Base64 connectionId
    * @param {*} callback Callback
    * @returns
    */
-  async validateUpload(
-    files,
-    datasetId,
-    orderId = null,
-    connectionId = null,
-    callback
-  ) {
+  async validateUpload({ files, datasetId, orderId = null, callback }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
-      }
-      if (connectionId == null) {
-        connectionId = this.connectionId;
       }
 
       const fileList = [];
@@ -1021,7 +1006,7 @@ class Neuropacs {
 
    * @returns {Number} Job run status code
    */
-  async runJob(productId, orderId = null, datasetId = null) {
+  async runJob({ productId, orderId = null, datasetId = null }) {
     if (orderId == null) {
       orderId = this.orderId;
     }
@@ -1070,7 +1055,7 @@ class Neuropacs {
   
    * @returns {Number} Job status message
    */
-  async checkStatus(orderId = null, datasetId = null) {
+  async checkStatus({ orderId = null, datasetId = null }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
@@ -1120,7 +1105,7 @@ class Neuropacs {
 
    * @returns  AES encrypted file data in specified format
    */
-  async getResults(format, orderId = null, datasetId = null) {
+  async getResults({ format, orderId = null, datasetId = null }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
