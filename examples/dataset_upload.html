@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
 
     <!-- NeuroPACS SDK -->
-    <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_0_0.min.js"></script>
-    <!-- <script src="../src/neuropacs.js"></script> -->
+    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_0_0.min.js"></script> -->
+    <script src="../src/neuropacs.js"></script>
 
     <title>NeuroPACS SDK Dataset Upload Example</title>
   </head>
@@ -32,7 +32,10 @@
           const files = document.getElementById("imageFiles").files;
 
           if (files.length > 0) {
-            const npcs = Neuropacs.init(serverUrl, apiKey);
+            const npcs = Neuropacs.init({
+              serverUrl: serverUrl,
+              apiKey: apiKey
+            });
 
             // CONNECT TO NEUROPACS
             const conn = await npcs.connect();
@@ -44,13 +47,13 @@
             // upload_dataset(files); // Call the upload function with the selected files
 
             // console.time("Upload time");
-            const datasetID = await npcs.uploadDataset(
-              files,
-              orderID,
-              (info) => {
+            const datasetID = await npcs.uploadDataset({
+              dataset: files,
+              orderId: orderID,
+              callback: (info) => {
                 console.log(info);
               }
-            );
+            });
             // console.timeEnd("Upload time");
 
             // console.log(datasetID);

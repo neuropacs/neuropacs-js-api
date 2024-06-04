@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
 
     <!-- NeuroPACS SDK -->
-    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_3.min.js"></script> -->
-    <script src="../src/neuropacs.js"></script>
+    <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_4.min.js"></script>
+    <!-- <script src="../src/neuropacs.js"></script> -->
 
     <title>NeuroPACS SDK Job Actions Example</title>
   </head>
@@ -47,25 +47,25 @@
         // console.log(valDat);
 
         // RUN A JOB
-        // const order = await npcs.runJob(
-        //   productId,
-        //   "db7058bd-6b90-45eb-b671-be2d9082bed3",
-        //   "db7058bd-6b90-45eb-b671-be2d9082bed3"
-        // );
-        // console.log(order);
-
-        const status = await npcs.checkStatus({
-          orderId: "db7058bd-6b90-45eb-b671-be2d9082bed3",
-          datasetId: "db7058bd-6b90-45eb-b671-be2d9082bed3"
+        const order = await npcs.runJob({
+          productId: productId,
+          orderId: "e7d6902d-b49f-4dae-9a41-4fe8cf510aab",
+          datasetId: "e7d6902d-b49f-4dae-9a41-4fe8cf510aab"
         });
-        console.log(status);
+        console.log(order);
 
-        const results = await npcs.getResults({
-          format: "TXT",
-          orderId: "db7058bd-6b90-45eb-b671-be2d9082bed3",
-          datasetId: "db7058bd-6b90-45eb-b671-be2d9082bed3"
-        });
-        console.log(results);
+        // const status = await npcs.checkStatus({
+        //   orderId: "db7058bd-6b90-45eb-b671-be2d9082bed3",
+        //   datasetId: "db7058bd-6b90-45eb-b671-be2d9082bed3"
+        // });
+        // console.log(status);
+
+        // const results = await npcs.getResults({
+        //   format: "TXT",
+        //   orderId: "db7058bd-6b90-45eb-b671-be2d9082bed3",
+        //   datasetId: "db7058bd-6b90-45eb-b671-be2d9082bed3"
+        // });
+        // console.log(results);
       }
       main();
     </script>

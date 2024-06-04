@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
 
     <!-- NeuroPACS SDK -->
-    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_3.min.js"></script> -->
+    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_4.min.js"></script> -->
     <script src="../src/neuropacs.js"></script>
 
     <title>NeuroPACS SDK Dataset Upload Example</title>
@@ -48,27 +48,27 @@
             const conn = await npcs.connect();
             console.log(conn);
             // CREATE A NEW JOB
-            // const orderID = await npcs.newJob();
-            // console.time("Upload time");
-            // const datasetID = await npcs.uploadDataset({
-            //   dataset: files,
-            //   orderId: orderID,
-            //   datasetId: orderID,
-            //   callback: (info) => {
-            //     console.log(info);
-            //   }
-            // });
-            // console.timeEnd("Upload time");
-
-            const verifyUpload = await npcs.validateUpload({
+            const orderID = await npcs.newJob();
+            console.time("Upload time");
+            const datasetID = await npcs.uploadDataset({
               dataset: files,
-              datasetId: "cf7aaa79-5798-40f2-ab26-230f9eeb655e",
-              orderId: "cf7aaa79-5798-40f2-ab26-230f9eeb655e",
-              callback: (val) => {
-                console.log(val);
+              orderId: orderID,
+              datasetId: orderID,
+              callback: (info) => {
+                console.log(info);
               }
             });
-            console.log(verifyUpload);
+            console.timeEnd("Upload time");
+
+            // const verifyUpload = await npcs.validateUpload({
+            //   dataset: files,
+            //   datasetId: "5c999f01-8084-49c1-94e3-8644d1e1cba3",
+            //   orderId: "5c999f01-8084-49c1-94e3-8644d1e1cba3",
+            //   callback: (val) => {
+            //     console.log(val);
+            //   }
+            // });
+            // console.log(verifyUpload);
 
             // console.log(datasetID);
           } else {

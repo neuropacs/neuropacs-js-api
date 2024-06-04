@@ -423,7 +423,7 @@ class Neuropacs {
    * @param {*} orderId Base64 orderId
    * @returns AWS UploadId
    */
-  #newMultipartUpload = async (datasetId, index, orderId) => {
+  #newMultipartUpload = async (datasetId, zipIndex, orderId) => {
     try {
       const url = `${this.serverUrl}/api/multipartUploadRequest/`;
 
@@ -436,7 +436,7 @@ class Neuropacs {
 
       const body = {
         datasetId: datasetId,
-        zipIndex: index
+        zipIndex: zipIndex
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -460,8 +460,7 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const resText = await response.text();
@@ -548,7 +547,7 @@ class Neuropacs {
    * @param {String} orderId Base64 orderId
    * @param {Number} partNumber Part number
    * @param {Bytes} partData Part data
-   * @returns
+   * @returns Etag
    */
   #uploadPart = async (
     uploadId,
@@ -606,7 +605,6 @@ class Neuropacs {
       const presignedUrl = resJson.presignedURL;
 
       let fail = false;
-      let failText = "";
       for (let attempt = 0; attempt < 3; attempt++) {
         const upload_res = await fetch(presignedUrl, {
           method: "PUT",
@@ -615,7 +613,6 @@ class Neuropacs {
 
         if (!upload_res.ok) {
           fail = true;
-          failText = await upload_res.text();
         } else {
           const eTag = upload_res.headers.get("ETag");
           return eTag;
@@ -628,6 +625,23 @@ class Neuropacs {
     } catch (e) {
       throw new Error(`Upload part failed: ${error.message || error}`);
     }
+  };
+
+  #hashStringWithSalt = async (input) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input + this.#generateSalt());
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return hashHex;
+  };
+
+  #generateSalt = async (length = 16) => {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array, (byte) => String.fromCharCode(byte)).join("");
   };
 
   /**
@@ -685,6 +699,8 @@ class Neuropacs {
           totalParts++;
         }
         zipBuilderObject[zipIndex].push(dataset[f]); //push file to index
+
+        // If current chunk size is larger than max, start next chunk
         if (curZipSize >= maxZipSize) {
           zipIndex++;
           curZipSize = 0;
@@ -705,18 +721,24 @@ class Neuropacs {
 
       let filesInSet = []; // Holds files for this 500MB chunk
 
+      // Start zipping and uploading each chunk
       for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
-        let jsZip = new JSZip(); // New JSZip instance
-
+        // Get uploadID
         const uploadId = await this.#newMultipartUpload(
           datasetId,
           index,
           orderId
-        ); // Get uploadID
+        );
+
+        let jsZip = new JSZip(); // New JSZip instance
 
         for (let f = 0; f < fileArray.length; f++) {
-          filesInSet.push(fileArray[f].name);
-          jsZip.file(fileArray[f].name, fileArray[f], { binary: true });
+          const hashed_filename = await this.#hashStringWithSalt(
+            fileArray[f].name
+          );
+          console.log(hashed_filename);
+          filesInSet.push(hashed_filename);
+          jsZip.file(hashed_filename, fileArray[f], { binary: true });
           await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
           if (callback) {
             const fileProcessed = f + 1;
@@ -736,7 +758,7 @@ class Neuropacs {
         const partSize = 5 * 1024 * 1024; // 5MB minimum part size
         //     //split into partSize chunks
         const blobParts = this.#splitBlob(blob, partSize);
-        const finalParts = [];
+        const finalParts = []; // Holds part details for complete multi upload
         for (let up = 0; up < blobParts.length; up++) {
           //upload part
           const ETag = await this.#uploadPart(
@@ -770,19 +792,6 @@ class Neuropacs {
           uploadId,
           finalParts
         );
-
-        // invoke callback
-        if (callback) {
-          // const filesUploaded = up + 1;
-          const progress = parseFloat(
-            ((fileArray.length / dataset.length) * 100).toFixed(2)
-          );
-          callback({
-            datasetId: datasetId,
-            progress: progress == 100.0 ? 100 : progress,
-            status: `Uploading part ${parseInt(index) + 1}/${totalParts}`
-          });
-        }
       }
       return 201;
     } catch (error) {
@@ -907,8 +916,11 @@ class Neuropacs {
       const fileList = [];
 
       for (let i = 0; i < dataset.length; i++) {
-        fileList.push({ name: dataset[i].name, size: dataset[i].size });
+        const hashed_filename = await this.#hashStringWithSalt(dataset[i].name);
+        fileList.push({ name: hashed_filename, size: dataset[i].size });
       }
+
+      const validationParts = this.#splitArray(fileList, 100);
 
       //encrypt order ID
       const encryptedOrderId = await this.#encryptAesCtr(
@@ -917,20 +929,6 @@ class Neuropacs {
         "string",
         "string"
       );
-
-      const validationParts = this.#splitArray(fileList, 100);
-
-      if (callback) {
-        const filesValidated = 0;
-        const progress = parseFloat(
-          ((filesValidated / dataset.length) * 100).toFixed(2)
-        );
-        callback({
-          datasetId: datasetId,
-          progress: progress == 100.0 ? 100 : progress,
-          status: "Validating"
-        });
-      }
 
       const url = `${this.serverUrl}/api/verifyUpload/`;
       const headers = {
