@@ -31,14 +31,6 @@
 
           const files = document.getElementById("imageFiles").files;
 
-          // const fileList = [];
-
-          // for (let i = 0; i < files.length; i++) {
-          //   fileList.push({ name: files[i].name, size: files[i].size });
-          // }
-
-          // console.log(fileList);
-
           if (files.length > 0) {
             const npcs = Neuropacs.init({
               serverUrl: serverUrl,
@@ -47,23 +39,11 @@
             // CONNECT TO NEUROPACS
             const conn = await npcs.connect();
             console.log(conn);
-            // CREATE A NEW JOB
-            const orderID = await npcs.newJob();
-            // console.time("Upload time");
-            // const datasetID = await npcs.uploadDataset({
-            //   dataset: files,
-            //   orderId: orderID,
-            //   datasetId: orderID,
-            //   callback: (info) => {
-            //     console.log(info);
-            //   }
-            // });
-            // console.timeEnd("Upload time");
 
             const verifyUpload = await npcs.validateUpload({
               dataset: files,
-              datasetId: "d7608a60-6950-4dd2-8adc-7b73fa596814",
-              orderId: "d7608a60-6950-4dd2-8adc-7b73fa596814",
+              datasetId: "5bad24cf-133c-40ce-bd57-482faac8444b",
+              orderId: "5bad24cf-133c-40ce-bd57-482faac8444b",
               callback: (val) => {
                 console.log(val);
               }

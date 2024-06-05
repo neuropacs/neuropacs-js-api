@@ -668,7 +668,7 @@ class Neuropacs {
 
       const zipBuilderObject = {}; // Object of chunks, each value is an array of files
 
-      const maxZipSize = 250000000; //max size of zip file (25 MB)
+      const maxZipSize = 50000000; //max size of zip file (25 MB)
       let totalParts = 0; // Counts total parts the dataset is divided into
       let curZipSize = 0; // Counts size of current zip file
       let zipIndex = 0; // Counts index of zip file
