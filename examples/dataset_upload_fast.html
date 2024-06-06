@@ -48,27 +48,27 @@
             const conn = await npcs.connect();
             console.log(conn);
             // CREATE A NEW JOB
-            // const orderID = await npcs.newJob();
-            // console.time("Upload time");
-            // const datasetID = await npcs.uploadDataset({
-            //   dataset: files,
-            //   orderId: orderID,
-            //   datasetId: orderID,
-            //   callback: (info) => {
-            //     console.log(info);
-            //   }
-            // });
-            // console.timeEnd("Upload time");
-
-            const verifyUpload = await npcs.validateUpload({
+            const orderID = await npcs.newJob();
+            console.time("Upload time");
+            const datasetID = await npcs.uploadDataset({
               dataset: files,
-              datasetId: "cf7aaa79-5798-40f2-ab26-230f9eeb655e",
-              orderId: "cf7aaa79-5798-40f2-ab26-230f9eeb655e",
-              callback: (val) => {
-                console.log(val);
+              orderId: orderID,
+              datasetId: orderID,
+              callback: (info) => {
+                console.log(info);
               }
             });
-            console.log(verifyUpload);
+            console.timeEnd("Upload time");
+
+            // const verifyUpload = await npcs.validateUpload({
+            //   dataset: files,
+            //   datasetId: "cf7aaa79-5798-40f2-ab26-230f9eeb655e",
+            //   orderId: "cf7aaa79-5798-40f2-ab26-230f9eeb655e",
+            //   callback: (val) => {
+            //     console.log(val);
+            //   }
+            // });
+            // console.log(verifyUpload);
 
             // console.log(datasetID);
           } else {
