@@ -153,7 +153,14 @@ class Neuropacs {
    */
   #getPublicKey = async () => {
     try {
-      const response = await fetch(`${this.serverUrl}/api/getPubKey/`);
+      const headers = {
+        "x-api-key": this.apiKey
+      };
+
+      const response = await fetch(`${this.serverUrl}/api/getPubKey/`, {
+        method: "GET",
+        headers: headers
+      });
 
       if (!response.ok) {
         throw new Error(JSON.parse(await response.text()).error);
@@ -450,7 +457,8 @@ class Neuropacs {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
         "Order-Id": encryptedOrderId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const response = await fetch(url, {
@@ -505,7 +513,8 @@ class Neuropacs {
         "Content-Type": "text/plain",
         "Order-Id": encryptedOrderId,
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -570,7 +579,8 @@ class Neuropacs {
         "Content-Type": "text/plain",
         "connection-id": this.connectionId,
         "Order-Id": encryptedOrderId,
-        client: this.client
+        client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -805,12 +815,12 @@ class Neuropacs {
     try {
       const headers = {
         "Content-Type": "text/plain",
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
-        aes_key: this.aesKey,
-        api_key: this.apiKey
+        aes_key: this.aesKey
       };
 
       const encryptedBody = await this.#oaepEncrypt(body);
@@ -849,7 +859,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const response = await fetch(url, {
@@ -938,7 +949,8 @@ class Neuropacs {
         "Dataset-Id": datasetId,
         "Order-Id": encryptedOrderId,
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       let totalValidated = 0;
@@ -1017,7 +1029,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -1065,7 +1078,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -1116,7 +1130,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const validFormats = ["TXT", "XML", "JSON"];
