@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- NeuroPACS SDK -->
+    <!-- <script src="https://d2g8ya06umhjvk.cloudfront.net/neuropacs-1_1_3.min.js"></script> -->
+    <script src="../src/neuropacs.js"></script>
+
+    <title>NeuroPACS SDK Dataset Upload Example</title>
+  </head>
+  <body>
+    <form id="uploadForm">
+      <input type="file" id="imageFiles" name="imageFiles" multiple />
+      <button type="submit">Upload Dataset</button>
+    </form>
+
+    <script>
+      // Add an event listener to the form for the submit event
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault(); // Prevent the default form submission
+
+          const apiKey = "m0ig54amrl87awtwlizcuji2bxacjm";
+          const serverUrl =
+            "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/v2";
+          const productId = "PD/MSA/PSP-v1.0";
+          const client = "API";
+          const format = "XML";
+
+          const files = document.getElementById("imageFiles").files;
+
+          if (files.length > 0) {
+            const npcs = Neuropacs.init({
+              serverUrl: serverUrl,
+              apiKey: apiKey
+            });
+            // CONNECT TO NEUROPACS
+            const conn = await npcs.connect();
+            console.log(conn);
+
+            const verifyUpload = await npcs.validateUpload({
+              dataset: files,
+              datasetId: "5bad24cf-133c-40ce-bd57-482faac8444b",
+              orderId: "5bad24cf-133c-40ce-bd57-482faac8444b",
+              callback: (val) => {
+                console.log(val);
+              }
+            });
+            console.log(verifyUpload);
+
+            // console.log(datasetID);
+          } else {
+            alert("Please select files to upload.");
+          }
+        });
+    </script>
+  </body>
+</html>
