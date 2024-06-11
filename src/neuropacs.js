@@ -1,5 +1,5 @@
 /*!
- * NeuroPACS v1.1.4
+ * NeuroPACS v1.1.5
  * (c) 2024 Kerrick Cavanaugh
  * Released under the MIT License.
  */
@@ -153,7 +153,14 @@ class Neuropacs {
    */
   #getPublicKey = async () => {
     try {
-      const response = await fetch(`${this.serverUrl}/api/getPubKey/`);
+      const headers = {
+        "x-api-key": this.apiKey
+      };
+
+      const response = await fetch(`${this.serverUrl}/api/getPubKey/`, {
+        method: "GET",
+        headers: headers
+      });
 
       if (!response.ok) {
         throw new Error(JSON.parse(await response.text()).error);
@@ -352,6 +359,33 @@ class Neuropacs {
   };
 
   /**
+   * Ensures filenames are unique (some scanners produce duplicate filenames)
+   * @param {Set} fileSet Set of existing file names
+   * @param {String} fileName File name to be added
+   * @returns {String} Unique filename
+   */
+  #ensureUniqueName = (fileSet, fileName) => {
+    let hasExt = false;
+    if (fileName.includes(".")) {
+      hasExt = true;
+    }
+
+    const baseName = hasExt ? fileName.replace(/\.[^/.]+$/, "") : fileName; // Extract base name
+    const extension = hasExt ? fileName.split(".").pop() : ""; // Extract extension if exists
+    let counter = 1;
+
+    let newName = fileName;
+    while (fileSet.has(newName)) {
+      newName = hasExt
+        ? `${baseName}_${counter}.${extension}`
+        : `${baseName}_${counter}`;
+      counter++;
+    }
+    fileSet.add(newName);
+    return newName;
+  };
+
+  /**
    * AES CTR decrypt cyphertext
    * @param {JSON/String/Bytes} encryptedData Ciphertext to be decrypted.
    * @param {String} aesKey Base64 AES key.
@@ -450,7 +484,8 @@ class Neuropacs {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
         "Order-Id": encryptedOrderId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const response = await fetch(url, {
@@ -505,7 +540,8 @@ class Neuropacs {
         "Content-Type": "text/plain",
         "Order-Id": encryptedOrderId,
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -570,7 +606,8 @@ class Neuropacs {
         "Content-Type": "text/plain",
         "connection-id": this.connectionId,
         "Order-Id": encryptedOrderId,
-        client: this.client
+        client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -668,14 +705,14 @@ class Neuropacs {
 
       const zipBuilderObject = {}; // Object of chunks, each value is an array of files
 
-      const maxZipSize = 50000000; //max size of zip file (25 MB)
+      const maxZipSize = 50000000; //max size of zip file (5 MB)
       let totalParts = 0; // Counts total parts the dataset is divided into
       let curZipSize = 0; // Counts size of current zip file
       let zipIndex = 0; // Counts index of zip file
       for (let f = 0; f < dataset.length; f++) {
         // Check if each object is a File
         if (!dataset[f] instanceof File) {
-          throw new Error(`Not a file`);
+          throw new Error(`Invalid object in datset.`);
         }
 
         curZipSize += dataset[f].size; // Increment current file set size
@@ -703,7 +740,7 @@ class Neuropacs {
         }
       }
 
-      let filesInSet = []; // Holds files for this 500MB chunk
+      const fileSet = new Set(); // Set to hold filename (to detect duplicates)
 
       for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
         let jsZip = new JSZip(); // New JSZip instance
@@ -715,17 +752,26 @@ class Neuropacs {
         ); // Get uploadID
 
         for (let f = 0; f < fileArray.length; f++) {
-          filesInSet.push(fileArray[f].name);
-          jsZip.file(fileArray[f].name, fileArray[f], { binary: true });
+          let curFilename = fileArray[f].name;
+
+          const unqiueFilename = this.#ensureUniqueName(fileSet, curFilename);
+
+          jsZip.file(unqiueFilename, fileArray[f], { binary: true });
           await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
           if (callback) {
             const fileProcessed = f + 1;
             const progress = parseFloat(
               ((fileProcessed / fileArray.length) * 100).toFixed(2)
             );
+
+            const totalProgress = parseFloat(
+              (100 / (2 * totalParts)) *
+                (2 * (parseInt(index) + 1 - 1) + progress / 100)
+            ).toFixed(2);
+
             callback({
               datasetId: datasetId,
-              progress: progress == 100.0 ? 100 : progress,
+              progress: totalProgress,
               status: `Compressing part ${parseInt(index) + 1}/${totalParts}`
             });
           }
@@ -755,9 +801,15 @@ class Neuropacs {
             const progress = parseFloat(
               ((fileProcessed / blobParts.length) * 100).toFixed(2)
             );
+
+            const totalProgress = parseFloat(
+              (100 / (2 * totalParts)) *
+                (2 * (parseInt(index) + 1 - 1) + 1 + progress / 100)
+            ).toFixed(2);
+
             callback({
               datasetId: datasetId,
-              progress: progress == 100.0 ? 100 : progress,
+              progress: totalProgress == 100.0 ? 100 : totalProgress,
               status: `Uploading part ${parseInt(index) + 1}/${totalParts}`
             });
           }
@@ -770,19 +822,6 @@ class Neuropacs {
           uploadId,
           finalParts
         );
-
-        // invoke callback
-        if (callback) {
-          // const filesUploaded = up + 1;
-          const progress = parseFloat(
-            ((fileArray.length / dataset.length) * 100).toFixed(2)
-          );
-          callback({
-            datasetId: datasetId,
-            progress: progress == 100.0 ? 100 : progress,
-            status: `Uploading part ${parseInt(index) + 1}/${totalParts}`
-          });
-        }
       }
       return 201;
     } catch (error) {
@@ -805,12 +844,12 @@ class Neuropacs {
     try {
       const headers = {
         "Content-Type": "text/plain",
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
-        aes_key: this.aesKey,
-        api_key: this.apiKey
+        aes_key: this.aesKey
       };
 
       const encryptedBody = await this.#oaepEncrypt(body);
@@ -849,7 +888,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const response = await fetch(url, {
@@ -905,9 +945,14 @@ class Neuropacs {
       }
 
       const fileList = [];
+      const fileSet = new Set(); // Tracks exisitng file names
 
       for (let i = 0; i < dataset.length; i++) {
-        fileList.push({ name: dataset[i].name, size: dataset[i].size });
+        let curFilename = dataset[i].name;
+
+        const unqiueFilename = this.#ensureUniqueName(fileSet, curFilename);
+
+        fileList.push({ name: unqiueFilename, size: dataset[i].size });
       }
 
       //encrypt order ID
@@ -938,7 +983,8 @@ class Neuropacs {
         "Dataset-Id": datasetId,
         "Order-Id": encryptedOrderId,
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       let totalValidated = 0;
@@ -1017,7 +1063,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -1065,7 +1112,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const body = {
@@ -1116,7 +1164,8 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client
+        Client: this.client,
+        "x-api-key": this.apiKey
       };
 
       const validFormats = ["TXT", "XML", "JSON"];
