@@ -361,20 +361,19 @@ class Neuropacs {
   /**
    * Ensures filenames are unique (some scanners produce duplicate filenames)
    * @param {Set} fileSet Set of existing file names
-   * @param {String} fileName File name to be added
+   * @param {String} filename File name to be added
    * @returns {String} Unique filename
    */
-  #ensureUniqueName = (fileSet, fileName) => {
+  #ensureUniqueName = (fileSet, filename) => {
     let hasExt = false;
-    if (fileName.includes(".")) {
+    if (filename.includes(".")) {
       hasExt = true;
     }
-
-    const baseName = hasExt ? fileName.replace(/\.[^/.]+$/, "") : fileName; // Extract base name
-    const extension = hasExt ? fileName.split(".").pop() : ""; // Extract extension if exists
+    const baseName = hasExt ? filename.replace(/\.[^/.]+$/, "") : filename; // Extract base name
+    const extension = hasExt ? filename.split(".").pop() : ""; // Extract extension if exists
     let counter = 1;
 
-    let newName = fileName;
+    let newName = filename;
     while (fileSet.has(newName)) {
       newName = hasExt
         ? `${baseName}_${counter}.${extension}`
@@ -442,6 +441,8 @@ class Neuropacs {
         return JSON.parse(decryptedText);
       } else if (formatOut === "string") {
         return decryptedText;
+      } else if (formatOut === "Uint8Array") {
+        return bytes(decryptedText);
       } else {
         throw new Error(`Invalid output format`);
       }
@@ -756,7 +757,8 @@ class Neuropacs {
 
           const unqiueFilename = this.#ensureUniqueName(fileSet, curFilename);
 
-          jsZip.file(unqiueFilename, fileArray[f], { binary: true });
+          jsZip.file(unqiueFilename, fileArray[f], { binary: true }); // Zip the file
+
           await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
           if (callback) {
             const fileProcessed = f + 1;
@@ -1151,10 +1153,16 @@ class Neuropacs {
    * @param {String} format Base64 AES key
    * @param {String} orderId Base64 connection_id(optional)
    * @param {String} datasetId Base64 dataset_id (optional)
+   * @param {String} dataType Type of data to be returned (defaults to "raw")
 
    * @returns  AES encrypted file data in specified format
    */
-  async getResults({ format, orderId = null, datasetId = null }) {
+  async getResults({
+    format,
+    orderId = null,
+    datasetId = null,
+    dataType = "raw"
+  }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
@@ -1168,11 +1176,11 @@ class Neuropacs {
         "x-api-key": this.apiKey
       };
 
-      const validFormats = ["TXT", "XML", "JSON"];
+      const validFormats = ["TXT", "XML", "JSON", "PNG"];
 
       if (!validFormats.includes(format)) {
         throw {
-          neuropacsError: `Invalid format! Valid formats include: "TXT", "JSON", "XML"`
+          neuropacsError: `Invalid format! Valid formats include: "TXT", "JSON", "XML", "PNG".`
         };
       }
 
@@ -1200,13 +1208,35 @@ class Neuropacs {
       }
 
       const text = await response.text();
-      const decryptedFileData = await this.#decryptAesCtr(
-        text,
-        this.aesKey,
-        "string"
-      );
 
-      return decryptedFileData;
+      let rawData;
+      switch (format) {
+        case "TXT":
+        case "JSON":
+        case "XML":
+          rawData = await this.#decryptAesCtr(text, this.aesKey, "string");
+          break;
+        case "PNG":
+          rawData = await this.#decryptAesCtr(text, this.aesKey, "Uint8Array");
+          break;
+      }
+
+      if (dataType === "raw") {
+        return rawData;
+      } else if (dataType === "blob") {
+        switch (format) {
+          case "TXT":
+            return new Blob([rawData], { type: "text/plain" });
+          case "JSON":
+            return new Blob([rawData], { type: "application/json" });
+          case "XML":
+            return new Blob([rawData], { type: "application/xml" });
+          case "PNG":
+            return new Blob([rawData], { type: "image/png" });
+        }
+      } else {
+        throw new Error("Invalid data type.");
+      }
     } catch (error) {
       throw new Error(`Check job status failed: ${error.message || error}`);
     }
