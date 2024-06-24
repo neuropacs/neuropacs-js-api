@@ -9,14 +9,14 @@ class Neuropacs {
    * Constructor
    * @param {String} apiKey API key for server
    * @param {String} serverUrl Server URL for an instance
-   * @param {String} client ClientID (default = "api")
+   * @param {String} originType Request origin (default = "API")
    */
-  constructor(serverUrl, apiKey, client = "api") {
+  constructor(serverUrl, apiKey, originType = "API") {
     this.apiKey = apiKey;
     this.serverUrl = serverUrl;
-    this.aesKey = this.#generateAesKey();
+    this.aesKey = "";
     this.orderId = "";
-    this.client = client;
+    this.originType = originType;
     this.connectionId = "";
   }
 
@@ -24,12 +24,12 @@ class Neuropacs {
    * Init method
    * @param {String} serverUrl URL of server
    * @param {String} apiKey API key
-   * @param {String} client client id (default = 'api')
+   * @param {String} originType originType (default = 'api')
 
    * @returns {Neuropacs} instance
    */
-  static init({ serverUrl, apiKey, client = "api" }) {
-    return new Neuropacs(serverUrl, apiKey, client);
+  static init({ serverUrl, apiKey, originType = "api" }) {
+    return new Neuropacs(serverUrl, apiKey, originType);
   }
 
   /**
@@ -51,7 +51,9 @@ class Neuropacs {
         }
       );
     } catch (error) {
-      throw new Error(`UUID generation failed: ${error.message || error}`);
+      throw new Error(
+        `UUID generation failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -86,7 +88,9 @@ class Neuropacs {
       const aesKeyBase64 = btoa(String.fromCharCode.apply(null, aesKey));
       return aesKeyBase64;
     } catch (error) {
-      throw new Error(`AES key generation failed: ${error.message || error}`);
+      throw new Error(
+        `AES key generation failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -143,7 +147,9 @@ class Neuropacs {
       const ciphertextBase64 = this.#arrayBufferToBase64(ciphertextArrayBuffer);
       return ciphertextBase64;
     } catch (error) {
-      throw new Error(`OAEP encryption failed: ${error.message || error}`);
+      throw new Error(
+        `OAEP encryption failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -152,17 +158,20 @@ class Neuropacs {
    * @returns {String} Base64 string public key.
    */
   #getPublicKey = async () => {
-    try {
-      const headers = {
-        "x-api-key": this.apiKey
-      };
+    const headers = {
+      "Origin-Type": this.originType
+    };
 
+    try {
       const response = await fetch(`${this.serverUrl}/api/getPubKey/`, {
         method: "GET",
         headers: headers
       });
 
       if (!response.ok) {
+        if (response.status == 403) {
+          throw new Error("CORS error.");
+        }
         throw new Error(JSON.parse(await response.text()).error);
       }
 
@@ -171,7 +180,7 @@ class Neuropacs {
       return pubKey;
     } catch (error) {
       throw new Error(
-        `Retrieval of public key failed: ${error.message || error}`
+        `Retrieval of public key failed: ${error.message || error.toString()}`
       );
     }
   };
@@ -191,7 +200,9 @@ class Neuropacs {
       return buf;
     } catch (error) {
       throw new Error(
-        `String to array buffer conversion failed: ${error.message || error}`
+        `String to array buffer conversion failed: ${
+          error.message || error.toString()
+        }`
       );
     }
   };
@@ -207,7 +218,9 @@ class Neuropacs {
       return btoa(String.fromCharCode.apply(null, binary));
     } catch (error) {
       throw new Error(
-        `Array buffer to base64 conversion failed: ${error.message || error}`
+        `Array buffer to base64 conversion failed: ${
+          error.message || error.toString()
+        }`
       );
     }
   };
@@ -245,7 +258,9 @@ class Neuropacs {
       }
       return parts;
     } catch (error) {
-      throw new Error(`Partitioning blob failed: ${error.message || error}`);
+      throw new Error(
+        `Partitioning blob failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -281,7 +296,9 @@ class Neuropacs {
       paddedData.set(data);
       return paddedData;
     } catch (error) {
-      throw new Error(`AES padding failed : ${error.message || error}`);
+      throw new Error(
+        `AES padding failed : ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -354,7 +371,9 @@ class Neuropacs {
         throw new Error(`Invalid output format`);
       }
     } catch (error) {
-      throw new Error(`AES encrption failed: ${error.message || error}`);
+      throw new Error(
+        `AES encrption failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -447,7 +466,9 @@ class Neuropacs {
         throw new Error(`Invalid output format`);
       }
     } catch (error) {
-      throw new Error(`AES decryption failed: ${error.message || error}`);
+      throw new Error(
+        `AES decryption failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -462,16 +483,10 @@ class Neuropacs {
     try {
       const url = `${this.serverUrl}/api/multipartUploadRequest/`;
 
-      const encryptedOrderId = await this.#encryptAesCtr(
-        orderId,
-        this.aesKey,
-        "string",
-        "string"
-      );
-
       const body = {
         datasetId: datasetId,
-        zipIndex: index
+        zipIndex: index,
+        orderId: orderId
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -484,9 +499,7 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        "Order-Id": encryptedOrderId,
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType
       };
 
       const response = await fetch(url, {
@@ -496,8 +509,7 @@ class Neuropacs {
       });
 
       if (!response.ok) {
-        const jsonErr = JSON.parse(await response.text());
-        throw { neuropacsError: `${jsonErr.error}` };
+        throw new Error(JSON.parse(await response.text()).error);
       }
 
       const resText = await response.text();
@@ -506,7 +518,9 @@ class Neuropacs {
       return resJson.uploadId;
     } catch (error) {
       throw new Error(
-        `Multipart upload initialization failed: ${error.message || error}`
+        `Multipart upload initialization failed: ${
+          error.message || error.toString()
+        }`
       );
     }
   };
@@ -530,26 +544,18 @@ class Neuropacs {
     try {
       const url = `${this.serverUrl}/api/completeMultipartUpload/`;
 
-      const encryptedOrderId = await this.#encryptAesCtr(
-        orderId,
-        this.aesKey,
-        "string",
-        "string"
-      );
-
       const headers = {
         "Content-Type": "text/plain",
-        "Order-Id": encryptedOrderId,
         "Connection-Id": this.connectionId,
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType
       };
 
       const body = {
         datasetId: datasetId,
         uploadId: uploadId,
         uploadParts: uploadParts,
-        zipIndex: zipIndex
+        zipIndex: zipIndex,
+        orderId: orderId
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -572,7 +578,9 @@ class Neuropacs {
       return 200;
     } catch (error) {
       throw new Error(
-        `Multipart upload completion failed: ${error.message || error}`
+        `Multipart upload completion failed: ${
+          error.message || error.toString()
+        }`
       );
     }
   };
@@ -596,26 +604,18 @@ class Neuropacs {
     partData
   ) => {
     try {
-      const encryptedOrderId = await this.#encryptAesCtr(
-        orderId,
-        this.aesKey,
-        "string",
-        "string"
-      );
-
       const headers = {
         "Content-Type": "text/plain",
-        "connection-id": this.connectionId,
-        "Order-Id": encryptedOrderId,
-        client: this.client,
-        "x-api-key": this.apiKey
+        "Connection-Id": this.connectionId,
+        "Origin-Type": this.originType
       };
 
       const body = {
         datasetId: datasetId,
         uploadId: uploadId,
         partNumber: partNumber,
-        zipIndex: index
+        zipIndex: index,
+        orderId: orderId
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -641,10 +641,9 @@ class Neuropacs {
       const resText = await response.text();
       const resJson = await this.#decryptAesCtr(resText, this.aesKey, "JSON");
 
-      const presignedUrl = resJson.presignedURL;
+      const presignedUrl = resJson.presignedUrl;
 
       let fail = false;
-      let failText = "";
       for (let attempt = 0; attempt < 3; attempt++) {
         const upload_res = await fetch(presignedUrl, {
           method: "PUT",
@@ -664,7 +663,9 @@ class Neuropacs {
         throw new Error(`Upload failed after 3 attempts`);
       }
     } catch (e) {
-      throw new Error(`Upload part failed: ${error.message || error}`);
+      throw new Error(
+        `Upload part failed: ${error.message || error.toString()}`
+      );
     }
   };
 
@@ -828,7 +829,7 @@ class Neuropacs {
       return 201;
     } catch (error) {
       throw new Error(
-        `Dataset upload attempt failed: ${error.message || error}`
+        `Dataset upload attempt failed: ${error.message || error.toString()}`
       );
     }
   };
@@ -846,12 +847,15 @@ class Neuropacs {
     try {
       const headers = {
         "Content-Type": "text/plain",
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType,
+        "X-Api-Key": this.apiKey
       };
 
+      const aesKey = this.#generateAesKey();
+      this.aesKey = aesKey;
+
       const body = {
-        aes_key: this.aesKey
+        aes_key: aesKey
       };
 
       const encryptedBody = await this.#oaepEncrypt(body);
@@ -867,7 +871,7 @@ class Neuropacs {
       }
 
       const json = await response.json();
-      const connectionId = json.connectionID;
+      const connectionId = json.connectionId;
       this.connectionId = connectionId;
       return {
         timestamp: this.#getTimeDateString(),
@@ -875,14 +879,16 @@ class Neuropacs {
         aesKey: this.aesKey
       };
     } catch (error) {
-      throw new Error(`Connection creation failed: ${error.message || error}`);
+      throw new Error(
+        `Connection creation failed: ${error.message || error.toString()}`
+      );
     }
   }
 
   /**
    * Create a new order
 
-   * @returns {String} Base64 string orderID.
+   * @returns {String} Base64 string orderId.
    */
   async newJob() {
     try {
@@ -890,12 +896,11 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType
       };
 
       const response = await fetch(url, {
-        method: "POST",
+        method: "GET",
         headers: headers
       });
 
@@ -904,11 +909,18 @@ class Neuropacs {
       }
 
       const text = await response.text();
-      const orderId = await this.#decryptAesCtr(text, this.aesKey, "string");
-      this.orderId = orderId;
-      return orderId;
+      const decryptedJson = await this.#decryptAesCtr(
+        text,
+        this.aesKey,
+        "JSON"
+      );
+
+      this.orderId = decryptedJson.orderId;
+      return decryptedJson.orderId;
     } catch (error) {
-      throw new Error(`Job creation failed: ${error.message || error}`);
+      throw new Error(
+        `Job creation failed: ${error.message || error.toString()}`
+      );
     }
   }
 
@@ -927,135 +939,20 @@ class Neuropacs {
       // Return success
       return { datasetId: datasetId, state: "success" };
     } catch (error) {
-      throw new Error(`Dataset upload failed: ${error.message || error}`);
-    }
-  }
-
-  /**
-   * Validate a dataset upload
-   * @param {Array[Files]} dataset Array of File objects
-   * @param {String} datasetId  Base64 datasetId
-   * @param {String} orderId Base64 orderId
-   * @param {Function} callback Callback
-   
-   * @returns {Array} Array of missing files
-   */
-  async validateUpload({ dataset, datasetId, orderId = null, callback }) {
-    try {
-      if (orderId == null) {
-        orderId = this.orderId;
-      }
-
-      const fileList = [];
-      const fileSet = new Set(); // Tracks exisitng file names
-
-      for (let i = 0; i < dataset.length; i++) {
-        let curFilename = dataset[i].name;
-
-        const unqiueFilename = this.#ensureUniqueName(fileSet, curFilename);
-
-        fileList.push({ name: unqiueFilename, size: dataset[i].size });
-      }
-
-      //encrypt order ID
-      const encryptedOrderId = await this.#encryptAesCtr(
-        orderId,
-        this.aesKey,
-        "string",
-        "string"
+      throw new Error(
+        `Dataset upload failed: ${error.message || error.toString()}`
       );
-
-      const validationParts = this.#splitArray(fileList, 100);
-
-      if (callback) {
-        const filesValidated = 0;
-        const progress = parseFloat(
-          ((filesValidated / dataset.length) * 100).toFixed(2)
-        );
-        callback({
-          datasetId: datasetId,
-          progress: progress == 100.0 ? 100 : progress,
-          status: "Validating"
-        });
-      }
-
-      const url = `${this.serverUrl}/api/verifyUpload/`;
-      const headers = {
-        "Content-Type": "text/plain",
-        "Dataset-Id": datasetId,
-        "Order-Id": encryptedOrderId,
-        "Connection-Id": this.connectionId,
-        Client: this.client,
-        "x-api-key": this.apiKey
-      };
-
-      let totalValidated = 0;
-
-      let totalMissingFiles = [];
-
-      for (let val = 0; val < validationParts.length; val++) {
-        const body = {
-          fileMetadata: validationParts[val]
-        };
-
-        const encryptedBody = await this.#encryptAesCtr(
-          body,
-          this.aesKey,
-          "JSON",
-          "string"
-        );
-
-        const response = await fetch(url, {
-          method: "POST",
-          headers: headers,
-          body: encryptedBody
-        });
-
-        if (!response.ok) {
-          throw new Error(JSON.parse(await response.text()).error);
-        }
-
-        const text = await response.text();
-
-        const decryptedDatasetValidation = await this.#decryptAesCtr(
-          text,
-          this.aesKey,
-          "JSON"
-        );
-
-        totalMissingFiles = totalMissingFiles.concat(
-          decryptedDatasetValidation.missingFiles
-        );
-
-        totalValidated += validationParts[val].length;
-
-        if (callback) {
-          const filesValidated = totalValidated;
-          const progress = parseFloat(
-            ((filesValidated / dataset.length) * 100).toFixed(2)
-          );
-          callback({
-            datasetId: datasetId,
-            progress: progress == 100.0 ? 100 : progress,
-            status: "Validating"
-          });
-        }
-      }
-      return { missingFiles: totalMissingFiles };
-    } catch (error) {
-      throw new Error(`Upload validation failed: ${error.message || error}`);
     }
   }
 
   /**
    * Run a job
-   * @param {String} productId Product to be executed
+   * @param {String} productName Product to be executed
    * @param {String} orderId Base64 order Id (optional)
-   * @param {String} datasetId Base64 dataset Id (optional)
 
    * @returns {Number} Job run status code
    */
-  async runJob({ productId, orderId = null, datasetId = null }) {
+  async runJob({ productName, orderId = null }) {
     if (orderId == null) {
       orderId = this.orderId;
     }
@@ -1065,14 +962,12 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType
       };
 
       const body = {
-        orderID: orderId,
-        productID: productId,
-        datasetID: datasetId
+        orderId: orderId,
+        productName: productName
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -1094,18 +989,17 @@ class Neuropacs {
 
       return response.status;
     } catch (error) {
-      throw new Error(`Job run failed: ${error.message || error}`);
+      throw new Error(`Job run failed: ${error.message || error.toString()}`);
     }
   }
 
   /**
    * Check job status
    * @param {String} orderId Base64 order_id (optional)
-   * @param {String} datasetId Base64 dataset_id (optional)
   
    * @returns {Number} Job status message
    */
-  async checkStatus({ orderId = null, datasetId = null }) {
+  async checkStatus({ orderId = null }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
@@ -1114,13 +1008,11 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType
       };
 
       const body = {
-        orderID: orderId,
-        datasetID: datasetId
+        orderId: orderId
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -1144,7 +1036,9 @@ class Neuropacs {
       const json = await this.#decryptAesCtr(text, this.aesKey, "JSON");
       return json;
     } catch (error) {
-      throw new Error(`Check job status failed: ${error.message || error}`);
+      throw new Error(
+        `Check job status failed: ${error.message || error.toString()}`
+      );
     }
   }
 
@@ -1152,17 +1046,11 @@ class Neuropacs {
    * Get job results
    * @param {String} format Base64 AES key
    * @param {String} orderId Base64 connection_id(optional)
-   * @param {String} datasetId Base64 dataset_id (optional)
    * @param {String} dataType Type of data to be returned (defaults to "raw")
 
    * @returns  AES encrypted file data in specified format
    */
-  async getResults({
-    format,
-    orderId = null,
-    datasetId = null,
-    dataType = "raw"
-  }) {
+  async getResults({ format, orderId = null, dataType = "raw" }) {
     try {
       if (orderId == null) {
         orderId = this.orderId;
@@ -1172,8 +1060,7 @@ class Neuropacs {
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
-        Client: this.client,
-        "x-api-key": this.apiKey
+        "Origin-Type": this.originType
       };
 
       const validFormats = ["TXT", "XML", "JSON", "PNG"];
@@ -1185,9 +1072,8 @@ class Neuropacs {
       }
 
       const body = {
-        orderID: orderId,
-        format: format,
-        datasetID: datasetId
+        orderId: orderId,
+        format: format
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -1238,7 +1124,9 @@ class Neuropacs {
         throw new Error("Invalid data type.");
       }
     } catch (error) {
-      throw new Error(`Check job status failed: ${error.message || error}`);
+      throw new Error(
+        `Check job status failed: ${error.message || error.toString()}`
+      );
     }
   }
 }
