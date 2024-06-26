@@ -1,5 +1,5 @@
 /*!
- * NeuroPACS v1.1.5
+ * NeuroPACS v1.1.6
  * (c) 2024 Kerrick Cavanaugh
  * Released under the MIT License.
  */
