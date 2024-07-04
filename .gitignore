@@ -1,5 +1,5 @@
-/tests/node_modules
-/tests/package-lock.json
+/node_modules
+/pack
+/package-lock.json
 .DS_Store
 /examples
-package.json
