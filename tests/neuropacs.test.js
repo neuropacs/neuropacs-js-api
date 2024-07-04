@@ -1,56 +1,31 @@
-/**
-- invalid server url
-- generate aes key
-    - success X
-- get public key
-    - success X
-- connect 
-    - success X
-    - invalid api key X
-- new job 
-    - success X
-    - invalid connection id X
-- upload 
-    - File object success 
-    - Uint8Array success 
-- upload dataset 
-    - dataset path success 
-- run job
-    - success
-    - invalid product 
-    - invalid order id 
-    - invalid connection id 
-- check status
-    - success 
-    - invalid order id 
-    - invalid connection id 
-- get results
-    - success 
-        - TXT 
-        - JSON 
-        - XML 
-    - invalid result format 
-    - invalid order id 
-    - invalid connection id
-**/
-
 require("../src/neuropacs.js");
+const {
+  isObject,
+  isValidAesCtrKey,
+  isValidUuid4,
+  isValidTimestamp
+} = require("./testUtils");
+
+const devServerUrl =
+  "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
+const invalidServerUrl =
+  "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
 
 const adminKey = "cdXVNIFzEUbSElTpoVoK4SyRrJ7Zj6n6Y6wgApIc";
 const regKey = "7PRHFkrxE71dpBNGw2HaS8PxesOzrZZB2XEWU3Xj";
 
 const npcsAdmin = Neuropacs.init({
-  serverUrl: "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev",
+  serverUrl: devServerUrl,
   apiKey: adminKey
 });
 
 const npcsReg = Neuropacs.init({
-  serverUrl: "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev",
+  serverUrl: devServerUrl,
   apiKey: regKey
 });
 
 const npcsInvalid = Neuropacs.init({
-  serverUrl: "https://invalid.execute-api.us-east-2.amazonaws.com/not_real",
+  serverUrl: invalidServerUrl,
   apiKey: regKey
 });
 
@@ -62,7 +37,13 @@ const npcsInvalid = Neuropacs.init({
 // });
 
 // Successful connection
-test("successful connection", async () => {
+test("successful connection with admin key", async () => {
   const session = await npcsAdmin.connect();
-  expect(typeof session).toBe("object");
+  const timestamp = session.timestamp;
+  const aesKey = session.aesKey;
+  const connectionId = session.connectionId;
+  expect(isObject(session)).toBe(true);
+  expect(isValidAesCtrKey(aesKey)).toBe(true);
+  expect(isValidTimestamp(timestamp)).toBe(true);
+  expect(isValidUuid4(connectionId)).toBe(true);
 });
