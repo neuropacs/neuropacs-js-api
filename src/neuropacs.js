@@ -120,6 +120,7 @@ class Neuropacs {
       );
       // base64 decode the string to get the binary data
       const binaryDerString = window.atob(pemContents);
+
       // convert from a binary string to an ArrayBuffer
       const publicKeyBuffer = this.#str2ab(binaryDerString);
 
