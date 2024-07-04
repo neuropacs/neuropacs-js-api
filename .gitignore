@@ -1,4 +1,4 @@
-/tests
+/tests/node_modules
+/tests/package-lock.json
 .DS_Store
-/node_modules
 /examples
