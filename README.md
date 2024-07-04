@@ -6,18 +6,15 @@ Connect to neuropacs diagnostic capabilities with our JavaScript API.
 
 ## Getting Started
 
-### Dependencies
-
-- SocketIO: [Download Here](https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js)
-
 ### Installation
 
 There are several bundles available:
 
-| Name             | Size | Description                       |
-| ---------------- | ---- | --------------------------------- |
-| neuropacs.js     | 20KB | Unminified version, with debug    |
-| neuropacs.min.js | 11KB | Production version, without debug |
+| Name                | Size | Description                               |
+| ------------------- | ---- | ----------------------------------------- |
+| neuropacs.js        | 20KB | Unminified version, with debug            |
+| neuropacs.min.js    | 11KB | Production version, without debug         |
+| neuropacs.module.js | 11KB | Production version, without debug, module |
 
 ### Usage
 
