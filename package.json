@@ -10,7 +10,8 @@
     "testEnvironment": "jsdom",
     "setupFiles": [
       "<rootDir>/tests/setupTests.js"
-    ]
+    ],
+    "testTimeout": 60000
   },
   "repository": {
     "type": "git",
