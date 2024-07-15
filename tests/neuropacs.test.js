@@ -16,8 +16,6 @@ const invalidServerUrl =
 const adminKey = process.env.ADMIN_API_KEY;
 const regKey = process.env.REG_API_KEY;
 
-//change
-
 const npcsAdmin = Neuropacs.init({
   serverUrl: devServerUrl,
   apiKey: adminKey
