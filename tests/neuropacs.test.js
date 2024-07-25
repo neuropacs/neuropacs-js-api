@@ -1,46 +1,60 @@
 require("../src/neuropacs.js");
 const {
-  isObject,
-  isValidAesCtrKey,
   isValidUuid4,
-  isValidTimestamp,
-  readDirectory
+  isValidSessionObj,
+  readDirectory,
+  isValidStatusObj,
+  devServerUrl,
+  adminKey,
+  originType,
+  regKey,
+  invalidKey,
+  invalidServerUrl
 } = require("./testUtils");
 const path = require("path");
 
-const devServerUrl =
-  "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
-const invalidServerUrl =
-  "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
-
-const adminKey = process.env.ADMIN_API_KEY;
-const regKey = process.env.REG_API_KEY;
-
 const npcsAdmin = Neuropacs.init({
   serverUrl: devServerUrl,
-  apiKey: adminKey
+  apiKey: adminKey,
+  originType: originType
 });
 
 const npcsReg = Neuropacs.init({
   serverUrl: devServerUrl,
-  apiKey: regKey
+  apiKey: regKey,
+  originType: originType
 });
 
-const npcsInvalid = Neuropacs.init({
+const npcsInvalidApiKey = Neuropacs.init({
+  serverUrl: devServerUrl,
+  apiKey: invalidKey,
+  originType: originType
+});
+
+const npcsInvalidServerUrl = Neuropacs.init({
   serverUrl: invalidServerUrl,
-  apiKey: regKey
+  apiKey: regKey,
+  originType: originType
+});
+
+// Invalid server URL
+test("invalid server URL", async () => {
+  await expect(npcsInvalidServerUrl.connect()).rejects.toThrow(
+    "Connection creation failed: OAEP encryption failed: Retrieval of public key failed: request to https://invalid.execute-api.us-east-2.amazonaws.com/not_real/api/getPubKey/ failed, reason: getaddrinfo ENOTFOUND invalid.execute-api.us-east-2.amazonaws.com"
+  );
 });
 
 // Successful connection
-test("successful connection with admin key", async () => {
+test("successful connection", async () => {
   const session = await npcsAdmin.connect();
-  const timestamp = session.timestamp;
-  const aesKey = session.aesKey;
-  const connectionId = session.connectionId;
-  expect(isObject(session)).toBe(true);
-  expect(isValidAesCtrKey(aesKey)).toBe(true);
-  expect(isValidTimestamp(timestamp)).toBe(true);
-  expect(isValidUuid4(connectionId)).toBe(true);
+  expect(isValidSessionObj(session)).toBe(true);
+});
+
+// Invalid API key
+test("invalid api key", async function () {
+  await expect(npcsInvalidApiKey.connect()).rejects.toThrow(
+    "Connection creation failed: API key not found."
+  );
 });
 
 // Successful order creation
@@ -48,6 +62,14 @@ test("successful order creation", async () => {
   await npcsAdmin.connect();
   const orderId = await npcsAdmin.newJob();
   expect(isValidUuid4(orderId)).toBe(true);
+});
+
+// Test no connection id in request header
+test("missing connection id in request header", async function () {
+  npcsReg.connectionId = "";
+  await expect(npcsReg.newJob()).rejects.toThrow(
+    "Job creation failed: No connection ID in request header."
+  );
 });
 
 // Successful dataset upload
@@ -66,4 +88,37 @@ test("successful order creation", async () => {
 //     }
 //   });
 //   console.log(uploadStatus);
+// });
+
+// Successful status check
+test("successful status check", async () => {
+  await npcsAdmin.connect();
+  const status = await npcsAdmin.checkStatus({ orderId: "TEST" });
+  expect(isValidStatusObj(status)).toBe(true);
+});
+
+// Invalid order Id
+test("Invalid order id in status check", async function () {
+  await npcsAdmin.connect();
+  await expect(npcsAdmin.checkStatus({ orderId: "NotValid" })).rejects.toThrow(
+    "Check job status failed: Bucket not found."
+  );
+});
+
+// // Successful result retrieval in raw txt format
+// test("successful result retrieval", async () => {
+//   await npcsAdmin.connect();
+//   const status = await npcsAdmin.getResults({
+//     orderId: "TEST",
+//     format: "TXT",
+//     dataType: "raw"
+//   });
+//   expect(isValidStatusObj(status)).toBe(true);
+// });
+
+// // Invalid result format
+// test("invalid result format", async () => {
+//   await npcsAdmin.connect();
+//   const status = await npcsAdmin.getResults({ orderId: "TEST" });
+//   expect(isValidStatusObj(status)).toBe(true);
 // });

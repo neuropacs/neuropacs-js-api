@@ -3,3 +3,5 @@
 /package-lock.json
 .DS_Store
 /examples
+/node_modules
+package-lock.json
