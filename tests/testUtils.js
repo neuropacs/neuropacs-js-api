@@ -8,10 +8,10 @@ const devServerUrl =
 const invalidServerUrl =
   "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
 
-// const adminKey = process.env.ADMIN_API_KEY;
-const adminKey = "IIhgYuScAuztZbWK54km38yc0da9him3Q3wyCuQ3";
-// const regKey = process.env.REG_API_KEY;
-const regKey = "IIhgYuScAuztZbWK54km38yc0da9him3Q3wyCuQ3";
+const adminKey = process.env.ADMIN_API_KEY;
+// const adminKey = "IIhgYuScAuztZbWK54km38yc0da9him3Q3wyCuQ3";
+const regKey = process.env.REG_API_KEY;
+// const regKey = "IIhgYuScAuztZbWK54km38yc0da9him3Q3wyCuQ3";
 const invalidKey = "invalidApiKey123";
 
 const originType = "Integration Tests";
