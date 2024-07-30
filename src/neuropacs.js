@@ -1038,7 +1038,7 @@ class Neuropacs {
       return json;
     } catch (error) {
       throw new Error(
-        `Check job status failed: ${error.message || error.toString()}`
+        `Status check failed: ${error.message || error.toString()}`
       );
     }
   }
@@ -1064,12 +1064,16 @@ class Neuropacs {
         "Origin-Type": this.originType
       };
 
-      const validFormats = ["TXT", "XML", "JSON", "PNG"];
+      // Make format case insensative
+      format = String(format).toLowerCase();
 
+      const validFormats = ["txt", "xml", "json", "png"];
+
+      // Check for invalid format
       if (!validFormats.includes(format)) {
-        throw {
-          neuropacsError: `Invalid format! Valid formats include: "TXT", "JSON", "XML", "PNG".`
-        };
+        throw new Error(
+          `Invalid format! Valid formats include: "txt", "json", "xml", "png".`
+        );
       }
 
       const body = {
@@ -1094,20 +1098,23 @@ class Neuropacs {
         throw new Error(JSON.parse(await response.text()).error);
       }
 
+      // Get raw response data
       const text = await response.text();
 
+      // Decrpyt raw data
       let rawData;
       switch (format) {
-        case "TXT":
-        case "JSON":
-        case "XML":
+        case "txt":
+        case "json":
+        case "xml":
           rawData = await this.#decryptAesCtr(text, this.aesKey, "string");
           break;
-        case "PNG":
+        case "png":
           rawData = await this.#decryptAesCtr(text, this.aesKey, "Uint8Array");
           break;
       }
 
+      // Generate correct output format
       if (dataType === "raw") {
         return rawData;
       } else if (dataType === "blob") {
@@ -1126,7 +1133,7 @@ class Neuropacs {
       }
     } catch (error) {
       throw new Error(
-        `Check job status failed: ${error.message || error.toString()}`
+        `Result retrieval failed: ${error.message || error.toString()}`
       );
     }
   }
