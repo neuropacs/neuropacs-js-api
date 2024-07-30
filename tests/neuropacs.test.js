@@ -10,7 +10,8 @@ const {
   regKey,
   invalidKey,
   invalidServerUrl,
-  isValidResultRawTxt
+  isValidResultRawTxt,
+  isValidResultRawJson
 } = require("./testUtils");
 const path = require("path");
 
@@ -98,7 +99,7 @@ test("successful status check", async () => {
   expect(isValidStatusObj(status)).toBe(true);
 });
 
-// Invalid order Id
+// Invalid order id in status check
 test("Invalid order id in status check", async function () {
   await npcsAdmin.connect();
   await expect(npcsAdmin.checkStatus({ orderId: "NotValid" })).rejects.toThrow(
@@ -106,49 +107,27 @@ test("Invalid order id in status check", async function () {
   );
 });
 
-// // Successful result retrieval in raw txt format
-// test("successful result retrieval in raw txt format", async () => {
-//   await npcsAdmin.connect();
-//   const status = await npcsAdmin.getResults({
-//     orderId: "TEST",
-//     format: "TXT",
-//     dataType: "raw"
-//   });
-//   expect(isValidResultRawTxt(status)).toBe(true);
-// });
+// Successful result retrieval in raw txt format
+test("successful result retrieval in raw txt format", async () => {
+  await npcsAdmin.connect();
+  const status = await npcsAdmin.getResults({
+    orderId: "TEST",
+    format: "TXT",
+    dataType: "raw"
+  });
+  expect(isValidResultRawTxt(status)).toBe(true);
+});
 
-// // Successful result retrieval in raw json format
-// test("successful result retrieval in raw json format", async () => {
-//   await npcsAdmin.connect();
-//   const status = await npcsAdmin.getResults({
-//     orderId: "TEST",
-//     format: "TXT",
-//     dataType: "raw"
-//   });
-//   expect(isValidResultRawTxt(status)).toBe(true);
-// });
-
-// // Successful result retrieval in raw xml format
-// test("successful result retrieval in raw txt format", async () => {
-//   await npcsAdmin.connect();
-//   const status = await npcsAdmin.getResults({
-//     orderId: "TEST",
-//     format: "TXT",
-//     dataType: "raw"
-//   });
-//   expect(isValidResultRawTxt(status)).toBe(true);
-// });
-
-// // Successful result retrieval in raw xml format
-// test("successful result retrieval in raw txt format", async () => {
-//   await npcsAdmin.connect();
-//   const status = await npcsAdmin.getResults({
-//     orderId: "TEST",
-//     format: "TXT",
-//     dataType: "raw"
-//   });
-//   expect(isValidResultRawTxt(status)).toBe(true);
-// });
+// Successful result retrieval in raw json format
+test("successful result retrieval in raw json format", async () => {
+  await npcsAdmin.connect();
+  const status = await npcsAdmin.getResults({
+    orderId: "TEST",
+    format: "json",
+    dataType: "raw"
+  });
+  expect(isValidResultRawJson(status)).toBe(true);
+});
 
 // Invalid result format
 test("invalid result format for result retrieval", async () => {
@@ -160,7 +139,9 @@ test("invalid result format for result retrieval", async () => {
       format: "INVALID",
       dataType: "raw"
     })
-  ).rejects.toThrow("Job creation failed: No connection ID in request header.");
+  ).rejects.toThrow(
+    'Result retrieval failed: Invalid format! Valid formats include: "txt", "json", "xml", "png".'
+  );
 });
 
 // Invalid result data type
@@ -173,5 +154,5 @@ test("invalid result data type for result retrieval", async () => {
       format: "TXT",
       dataType: "INVALID"
     })
-  ).rejects.toThrow("Job creation failed: No connection ID in request header.");
+  ).rejects.toThrow("Result retrieval failed: Invalid data type.");
 });
