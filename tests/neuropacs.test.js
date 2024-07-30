@@ -9,7 +9,8 @@ const {
   originType,
   regKey,
   invalidKey,
-  invalidServerUrl
+  invalidServerUrl,
+  isValidResultRawTxt
 } = require("./testUtils");
 const path = require("path");
 
@@ -101,24 +102,76 @@ test("successful status check", async () => {
 test("Invalid order id in status check", async function () {
   await npcsAdmin.connect();
   await expect(npcsAdmin.checkStatus({ orderId: "NotValid" })).rejects.toThrow(
-    "Check job status failed: Bucket not found."
+    "Status check failed: Bucket not found."
   );
 });
 
 // // Successful result retrieval in raw txt format
-// test("successful result retrieval", async () => {
+// test("successful result retrieval in raw txt format", async () => {
 //   await npcsAdmin.connect();
 //   const status = await npcsAdmin.getResults({
 //     orderId: "TEST",
 //     format: "TXT",
 //     dataType: "raw"
 //   });
-//   expect(isValidStatusObj(status)).toBe(true);
+//   expect(isValidResultRawTxt(status)).toBe(true);
 // });
 
-// // Invalid result format
-// test("invalid result format", async () => {
+// // Successful result retrieval in raw json format
+// test("successful result retrieval in raw json format", async () => {
 //   await npcsAdmin.connect();
-//   const status = await npcsAdmin.getResults({ orderId: "TEST" });
-//   expect(isValidStatusObj(status)).toBe(true);
+//   const status = await npcsAdmin.getResults({
+//     orderId: "TEST",
+//     format: "TXT",
+//     dataType: "raw"
+//   });
+//   expect(isValidResultRawTxt(status)).toBe(true);
 // });
+
+// // Successful result retrieval in raw xml format
+// test("successful result retrieval in raw txt format", async () => {
+//   await npcsAdmin.connect();
+//   const status = await npcsAdmin.getResults({
+//     orderId: "TEST",
+//     format: "TXT",
+//     dataType: "raw"
+//   });
+//   expect(isValidResultRawTxt(status)).toBe(true);
+// });
+
+// // Successful result retrieval in raw xml format
+// test("successful result retrieval in raw txt format", async () => {
+//   await npcsAdmin.connect();
+//   const status = await npcsAdmin.getResults({
+//     orderId: "TEST",
+//     format: "TXT",
+//     dataType: "raw"
+//   });
+//   expect(isValidResultRawTxt(status)).toBe(true);
+// });
+
+// Invalid result format
+test("invalid result format for result retrieval", async () => {
+  await npcsAdmin.connect();
+
+  await expect(
+    npcsAdmin.getResults({
+      orderId: "TEST",
+      format: "INVALID",
+      dataType: "raw"
+    })
+  ).rejects.toThrow("Job creation failed: No connection ID in request header.");
+});
+
+// Invalid result data type
+test("invalid result data type for result retrieval", async () => {
+  await npcsAdmin.connect();
+
+  await expect(
+    npcsAdmin.getResults({
+      orderId: "TEST",
+      format: "TXT",
+      dataType: "INVALID"
+    })
+  ).rejects.toThrow("Job creation failed: No connection ID in request header.");
+});
