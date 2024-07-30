@@ -106,6 +106,8 @@ const isValidResultRawJson = (result) => {
 
 const isValidResultRawPng = (result) => {};
 
+const isValidResultRawXml = (result) => {};
+
 const isValidResultRawTxt = (result) => {
   return typeof result == "string" && String(result).length > 0;
 };
