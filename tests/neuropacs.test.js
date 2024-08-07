@@ -15,6 +15,15 @@ const {
 } = require("./testUtils");
 const path = require("path");
 
+/**
+ * Tests to do
+ *  - admin key access to non admin job info (should succeed)
+ *  - non admin key access to admin job info (should fail)
+ *  - dataset upload (JS)
+ *  -
+ *
+ */
+
 const npcsAdmin = Neuropacs.init({
   serverUrl: devServerUrl,
   apiKey: adminKey,
