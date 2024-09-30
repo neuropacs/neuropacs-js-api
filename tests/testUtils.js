@@ -4,7 +4,7 @@ const fs = require("fs").promises;
 const path = require("path");
 
 const devServerUrl =
-  "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
+  "https://aw75e2na5m.execute-api.us-east-1.amazonaws.com/dev";
 const invalidServerUrl =
   "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
 

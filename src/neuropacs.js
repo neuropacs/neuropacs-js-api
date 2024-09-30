@@ -111,20 +111,21 @@ class Neuropacs {
     try {
       const publicKey = await this.#getPublicKey();
 
-      // fetch the part of the PEM string between header and footer
+      // extract the part of the PEM string between header and footer
       const pemHeader = "-----BEGIN PUBLIC KEY-----";
       const pemFooter = "-----END PUBLIC KEY-----";
       const pemContents = publicKey.substring(
         pemHeader.length,
         publicKey.length - pemFooter.length - 1
       );
+
       // base64 decode the string to get the binary data
       const binaryDerString = window.atob(pemContents);
 
       // convert from a binary string to an ArrayBuffer
       const publicKeyBuffer = this.#str2ab(binaryDerString);
 
-      // Convert the public key to ArrayBuffer
+      // Convert the public key to public key objecct
       const publicKeyObject = await crypto.subtle.importKey(
         "spki",
         publicKeyBuffer,
@@ -135,7 +136,7 @@ class Neuropacs {
         true,
         ["encrypt"]
       );
-      // Encrypt the plaintext using OAEP padding
+      // Encrypt the plaintext using OAEP
       const ciphertextArrayBuffer = await crypto.subtle.encrypt(
         {
           name: "RSA-OAEP"
@@ -1064,8 +1065,9 @@ class Neuropacs {
         "Origin-Type": this.originType
       };
 
-      // Make format case insensative
+      // Make format and dataType case insensative
       format = String(format).toLowerCase();
+      dataType = String(dataType).toLowerCase();
 
       const validFormats = ["txt", "xml", "json", "png"];
 
