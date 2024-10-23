@@ -1,4 +1,5 @@
 [![Integration Tests](https://github.com/neuropacs/neuropacs-js-api/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/neuropacs/neuropacs-js-api/actions/workflows/ci.yaml)
+![CodeQL](https://github.com/neuropacs/neuropacs-js-api/actions/workflows/codeql-analysis.yml/badge.svg)
 
 # neuropacs™ JavaScript API
 
