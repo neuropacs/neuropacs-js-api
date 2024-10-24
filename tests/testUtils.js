@@ -3,13 +3,14 @@ const base64 = require("base-64");
 const fs = require("fs").promises;
 const path = require("path");
 
-const devServerUrl =
-  "https://aw75e2na5m.execute-api.us-east-1.amazonaws.com/dev";
+const serverUrl =
+  "https://zq5jg2kqvj.execute-api.us-east-1.amazonaws.com/staging";
 const invalidServerUrl =
   "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
 
 const adminKey = process.env.ADMIN_API_KEY;
 const regKey = process.env.REG_API_KEY;
+
 const invalidKey = "invalidApiKey123";
 
 const originType = "Integration Tests";
@@ -136,7 +137,7 @@ module.exports = {
   isValidResultRawPng,
   isValidResultBlobPng,
   isValidSessionObj,
-  devServerUrl,
+  serverUrl,
   invalidKey,
   invalidServerUrl,
   adminKey,

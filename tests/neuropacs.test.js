@@ -4,7 +4,7 @@ const {
   isValidSessionObj,
   readDirectory,
   isValidStatusObj,
-  devServerUrl,
+  serverUrl,
   adminKey,
   originType,
   regKey,
@@ -25,19 +25,19 @@ const path = require("path");
  */
 
 const npcsAdmin = Neuropacs.init({
-  serverUrl: devServerUrl,
+  serverUrl: serverUrl,
   apiKey: adminKey,
   originType: originType
 });
 
 const npcsReg = Neuropacs.init({
-  serverUrl: devServerUrl,
+  serverUrl: serverUrl,
   apiKey: regKey,
   originType: originType
 });
 
 const npcsInvalidApiKey = Neuropacs.init({
-  serverUrl: devServerUrl,
+  serverUrl: serverUrl,
   apiKey: invalidKey,
   originType: originType
 });
