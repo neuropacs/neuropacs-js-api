@@ -782,14 +782,14 @@ class Neuropacs {
           }
         }
 
-        //create a blob object for zip file contents
+        // Create a blob object for zip file contents
         const blob = await jsZip.generateAsync({ type: "blob" });
         const partSize = 5 * 1024 * 1024; // 5MB minimum part size
-        //     //split into partSize chunks
+        // Split into partSize chunks
         const blobParts = this.#splitBlob(blob, partSize);
         const finalParts = [];
         for (let up = 0; up < blobParts.length; up++) {
-          //upload part
+          // Upload part
           const ETag = await this.#uploadPart(
             uploadId,
             datasetId,
@@ -798,7 +798,7 @@ class Neuropacs {
             up + 1,
             blobParts[up]
           );
-          //push to finalParts array
+          // Push to finalParts array
           finalParts.push({ PartNumber: up + 1, ETag: ETag });
 
           if (callback) {
@@ -819,7 +819,7 @@ class Neuropacs {
             });
           }
         }
-        //complete multipart upload
+        // Complete multipart upload
         await this.#completeMultipartUpload(
           orderId,
           datasetId,
