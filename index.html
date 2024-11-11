@@ -54,19 +54,19 @@
           <tbody>
             <tr>
               <td>neuropacs.js</td>
-              <td>31KB</td>
+              <td>36.5KB</td>
               <td>Unminified version, with debug</td>
               <td>https://d3tequ3xv41td3.cloudfront.net/js/neuropacs.js</td>
             </tr>
             <tr>
               <td>neuropacs.min.js</td>
-              <td>11KB</td>
+              <td>13KB</td>
               <td>Production version, without debug</td>
               <td>https://d3tequ3xv41td3.cloudfront.net/js/neuropacs.min.js</td>
             </tr>
             <tr>
               <td>neuropacs.module.js</td>
-              <td>11KB</td>
+              <td>13KB</td>
               <td>Production version, without debug, module</td>
               <td>
                 https://d3tequ3xv41td3.cloudfront.net/js/neuropacs.module.js
@@ -128,11 +128,10 @@
     <span class="code-comment"># Create a new order</span>
     <span class="code-keyword">const</span> order_id = <span class="code-keyword">await</span> npcs.<span class="code-function">newJob();</span>
 
-    <span class="code-comment"># Upload a dataset</span>
-    <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">upload_dataset</span>({
-        dataset: dataset,
+    <span class="code-comment"># Upload a dataset from path</span>
+    <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">upload_dataset_from_path</span>({
         orderId: orderId,
-        datasetId: orderId,
+        dataset: dataset,
         callback: (info) => {
           console.log(info);
         }
@@ -140,8 +139,8 @@
 
     <span class="code-comment"># Start an order</span>
     <span class="code-keyword">const</span> order_start = <span class="code-keyword">await</span> npcs.<span class="code-function">runJob</span>({
-        productName: productName,
         orderId: orderId
+        productName: productName
       });
 
     <span class="code-comment"># Check order status</span>
@@ -151,9 +150,9 @@
 
     <span class="code-comment"># Retrieve job results</span>
     <span class="code-keyword">const</span> results = <span class="code-keyword">await</span> npcs.<span class="code-function">getResults</span>({
-        format: predictionFormat,
-        dataType: predictionDataType,
         orderId: orderId
+        format: predictionFormat,
+        dataType: predictionDataType
       });
         </code></pre>
       </section>
