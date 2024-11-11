@@ -13,9 +13,9 @@ There are several bundles available:
 
 | Name                | Size | Description                               |
 | ------------------- | ---- | ----------------------------------------- |
-| neuropacs.js        | 31KB | Unminified version, with debug            |
-| neuropacs.min.js    | 11KB | Production version, without debug         |
-| neuropacs.module.js | 11KB | Production version, without debug, module |
+| neuropacs.js        | 37KB | Unminified version, with debug            |
+| neuropacs.min.js    | 13KB | Production version, without debug         |
+| neuropacs.module.js | 13KB | Production version, without debug, module |
 
 ### Include in project
 
@@ -84,9 +84,7 @@ Option 2: Import via CDN
       });
       const dataset = [file1, file2, file3];
 
-      // --> datasetId param is optional (one will be generated for you if you do not specify it). We recommend using the orderId as the datasetId for simplicity
-      const datasetID = await npcs.uploadDataset({
-        dataset: dataset,
+      const datasetID = await npcs.uploadDatasetFromPath({
         orderId: orderId,
         datasetId: orderId,
         callback: (info) => {
@@ -97,8 +95,8 @@ Option 2: Import via CDN
       // START A JOB
       // --> Valid productName options: PD/MSA/PSP-v1.0
       const order = await npcs.runJob({
-        productName: productName,
-        orderId: orderId
+        orderId: orderId,
+        productName: productName
       });
 
       // CHECK STATUS
@@ -110,9 +108,9 @@ Option 2: Import via CDN
       // --> Valid format options: JSON, TXT, XML, PNG
       // --> Valid dataType options: RAW, BLOB
       const results = await npcs.getResults({
+        orderId: orderId
         format: predictionFormat,
         dataType: predictionDataType,
-        orderId: orderId
       });
     } catch (e) {
       console.log(e);

@@ -5,15 +5,19 @@ const path = require("path");
 
 const serverUrl =
   "https://zq5jg2kqvj.execute-api.us-east-1.amazonaws.com/staging";
+
 const invalidServerUrl =
   "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
 
 const adminKey = process.env.ADMIN_API_KEY;
 const regKey = process.env.REG_API_KEY;
+const noUsageRemainingApiKey = process.env.NO_USAGES_REMAINING_API_KEY;
 
 const invalidKey = "invalidApiKey123";
+const invalidOrderId = "notARealOrderId";
+const productId = "Atypical/MSAp/PSP-v1.0";
 
-const originType = "Integration Tests";
+const originType = "JS Integration Tests";
 
 const isValidUuid4 = (value) => {
   return uuidValidate(value) && uuidVersion(value) === 4;
@@ -142,5 +146,8 @@ module.exports = {
   invalidServerUrl,
   adminKey,
   regKey,
-  originType
+  noUsageRemainingApiKey,
+  originType,
+  invalidOrderId,
+  productId
 };

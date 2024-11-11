@@ -11,7 +11,10 @@ const {
   invalidKey,
   invalidServerUrl,
   isValidResultRawTxt,
-  isValidResultRawJson
+  isValidResultRawJson,
+  noUsageRemainingApiKey,
+  invalidOrderId,
+  productId
 } = require("./testUtils");
 const path = require("path");
 
@@ -39,6 +42,12 @@ const npcsReg = Neuropacs.init({
 const npcsInvalidApiKey = Neuropacs.init({
   serverUrl: serverUrl,
   apiKey: invalidKey,
+  originType: originType
+});
+
+const npcsNoRemainingUsages = Neuropacs.init({
+  serverUrl: serverUrl,
+  apiKey: noUsageRemainingApiKey,
   originType: originType
 });
 
@@ -75,11 +84,12 @@ test("successful order creation", async () => {
   expect(isValidUuid4(orderId)).toBe(true);
 });
 
-// Test no connection id in request header
-test("missing connection id in request header", async function () {
-  npcsReg.connectionId = "";
+// Test no connection params
+test("missing connection parameters", async function () {
+  npcsReg.aesKey = null;
+  npcsReg.connectionId = null;
   await expect(npcsReg.newJob()).rejects.toThrow(
-    "Job creation failed: No connection ID in request header."
+    "Job creation failed: Missing session parameters, start a new session with 'connect()' and try again."
   );
 });
 
@@ -100,6 +110,14 @@ test("missing connection id in request header", async function () {
 //   });
 //   console.log(uploadStatus);
 // });
+
+// Invalid order
+test("invalid order id", async function () {
+  await npcsReg.connect();
+  await expect(
+    npcsReg.runJob({ orderId: invalidOrderId, productName: productId })
+  ).rejects.toThrow("Job run failed: Bucket not found.");
+});
 
 // Successful status check
 test("successful status check", async () => {
@@ -148,9 +166,7 @@ test("invalid result format for result retrieval", async () => {
       format: "INVALID",
       dataType: "raw"
     })
-  ).rejects.toThrow(
-    'Result retrieval failed: Invalid format! Valid formats include: "txt", "json", "xml", "png".'
-  );
+  ).rejects.toThrow("Result retrieval failed: Invalid format");
 });
 
 // Invalid result data type

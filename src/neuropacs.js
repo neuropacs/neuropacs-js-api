@@ -1,5 +1,5 @@
 /*!
- * NeuroPACS v1.1.6
+ * NeuroPACS v1.1.8
  * (c) 2024 Kerrick Cavanaugh
  * Released under the MIT License.
  */
@@ -14,10 +14,10 @@ class Neuropacs {
   constructor(serverUrl, apiKey, originType = "API") {
     this.apiKey = apiKey;
     this.serverUrl = serverUrl;
-    this.aesKey = "";
-    this.orderId = "";
+    this.aesKey = null;
     this.originType = originType;
-    this.connectionId = "";
+    this.connectionId = null;
+    this.maxZipSize = 15 * 1024 * 1024; // 10MB max zip file size
   }
 
   /**
@@ -476,9 +476,9 @@ class Neuropacs {
 
   /**
    * Start new multipart upload
-   * @param {*} datasetId Base64 datasetId
-   * @param {Number} zipIndex Index of zip file
-   * @param {*} orderId Base64 orderId
+   * @param {String} datasetId Base64 datasetId
+   * @param {Number} partIndex Index of zip file
+   * @param {String} orderId Base64 orderId
    * @returns AWS UploadId
    */
   #newMultipartUpload = async (datasetId, index, orderId) => {
@@ -531,7 +531,7 @@ class Neuropacs {
    * Complete multipart upload
    * @param {String} orderId Base64 orderId
    * @param {String} datasetId Base64 datasetId
-   * @param {Number} zipIndex Index of zip file
+   * @param {Number} partIndex Index of zip file
    * @param {String} uploadId Base64 uploadId
    * @param {Object} uploadParts Uploaded parts object
    * @returns status code
@@ -591,7 +591,7 @@ class Neuropacs {
    * Upload a part of the multipart upload
    * @param {String} uploadId Base64 uploadId
    * @param {String} datasetId Base64 datasetId
-   * @param {Number} zipIndex Index of zip file
+   * @param {Number} partIndex Index of zip file
    * @param {String} orderId Base64 orderId
    * @param {Number} partNumber Part number
    * @param {Bytes} partData Part data
@@ -600,7 +600,7 @@ class Neuropacs {
   #uploadPart = async (
     uploadId,
     datasetId,
-    index,
+    zipIndex,
     orderId,
     partNumber,
     partData
@@ -616,7 +616,7 @@ class Neuropacs {
         datasetId: datasetId,
         uploadId: uploadId,
         partNumber: partNumber,
-        zipIndex: index,
+        zipIndex: zipIndex,
         orderId: orderId
       };
 
@@ -671,169 +671,22 @@ class Neuropacs {
     }
   };
 
-  /**
-   * Attempt upload dataset
-   * @param {Array<File>} missingFiles Array of File objects missing from original uploadDataset
-   * @param {String} orderId Base64 orderId (optional)
-   * @param {String} datasetId Base64 datasetId (optional)
-   * @param {Function} callback Callback for progress updates
-   * @returns {Number} Upload status code.
-   */
-  #attemptUploadDataset = async (
-    dataset,
-    orderId = null,
-    datasetId = null,
-    callback = null
-  ) => {
-    try {
-      /**
-       * DATASET UPLOAD
-       */
-
-      if (!dataset instanceof FileList) {
-        throw new Error(`Dataset must be an array of files`);
+  // Helper function to parse boundary from Content-Type header
+  #parseBoundary = (contentType) => {
+    console.log(contentType);
+    const items = contentType.split(";");
+    for (let item of items) {
+      item = item.trim();
+      if (item.startsWith("boundary=")) {
+        let boundaryValue = item.slice("boundary=".length);
+        // Remove quotes if present
+        if (boundaryValue.startsWith('"') && boundaryValue.endsWith('"')) {
+          boundaryValue = boundaryValue.slice(1, -1);
+        }
+        return boundaryValue;
       }
-
-      if (orderId == null) {
-        orderId = this.orderId;
-      }
-
-      if (datasetId == null) {
-        datasetId = this.#generateUniqueUUID();
-      }
-
-      //load JSZip
-      await this.#loadScript(
-        "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
-      );
-
-      const zipBuilderObject = {}; // Object of chunks, each value is an array of files
-
-      const maxZipSize = 50000000; //max size of zip file (5 MB)
-      let totalParts = 0; // Counts total parts the dataset is divided into
-      let curZipSize = 0; // Counts size of current zip file
-      let zipIndex = 0; // Counts index of zip file
-      for (let f = 0; f < dataset.length; f++) {
-        // Check if each object is a File
-        if (!dataset[f] instanceof File) {
-          throw new Error(`Invalid object in datset.`);
-        }
-
-        curZipSize += dataset[f].size; // Increment current file set size
-        // Create array at zipIndex if does not already exist
-        if (!zipBuilderObject[zipIndex]) {
-          zipBuilderObject[zipIndex] = [];
-          totalParts++;
-        }
-        zipBuilderObject[zipIndex].push(dataset[f]); //push file to index
-        if (curZipSize >= maxZipSize) {
-          zipIndex++;
-          curZipSize = 0;
-        }
-        // Call callback for preprocessing
-        if (callback) {
-          const fileProcessed = f + 1;
-          const progress = parseFloat(
-            ((fileProcessed / dataset.length) * 100).toFixed(2)
-          );
-          callback({
-            datasetId: datasetId,
-            progress: progress == 100.0 ? 100 : progress,
-            status: "Preprocessing"
-          });
-        }
-      }
-
-      const fileSet = new Set(); // Set to hold filename (to detect duplicates)
-
-      for (const [index, fileArray] of Object.entries(zipBuilderObject)) {
-        let jsZip = new JSZip(); // New JSZip instance
-
-        const uploadId = await this.#newMultipartUpload(
-          datasetId,
-          index,
-          orderId
-        ); // Get uploadID
-
-        for (let f = 0; f < fileArray.length; f++) {
-          let curFilename = fileArray[f].name;
-
-          const unqiueFilename = this.#ensureUniqueName(fileSet, curFilename);
-
-          jsZip.file(unqiueFilename, fileArray[f], { binary: true }); // Zip the file
-
-          await new Promise((resolve) => setTimeout(resolve, 0)); //release memory
-          if (callback) {
-            const fileProcessed = f + 1;
-            const progress = parseFloat(
-              ((fileProcessed / fileArray.length) * 100).toFixed(2)
-            );
-
-            const totalProgress = parseFloat(
-              (100 / (2 * totalParts)) *
-                (2 * (parseInt(index) + 1 - 1) + progress / 100)
-            ).toFixed(2);
-
-            callback({
-              datasetId: datasetId,
-              progress: totalProgress,
-              status: `Compressing part ${parseInt(index) + 1}/${totalParts}`
-            });
-          }
-        }
-
-        // Create a blob object for zip file contents
-        const blob = await jsZip.generateAsync({ type: "blob" });
-        const partSize = 5 * 1024 * 1024; // 5MB minimum part size
-        // Split into partSize chunks
-        const blobParts = this.#splitBlob(blob, partSize);
-        const finalParts = [];
-        for (let up = 0; up < blobParts.length; up++) {
-          // Upload part
-          const ETag = await this.#uploadPart(
-            uploadId,
-            datasetId,
-            index,
-            orderId,
-            up + 1,
-            blobParts[up]
-          );
-          // Push to finalParts array
-          finalParts.push({ PartNumber: up + 1, ETag: ETag });
-
-          if (callback) {
-            const fileProcessed = up + 1;
-            const progress = parseFloat(
-              ((fileProcessed / blobParts.length) * 100).toFixed(2)
-            );
-
-            const totalProgress = parseFloat(
-              (100 / (2 * totalParts)) *
-                (2 * (parseInt(index) + 1 - 1) + 1 + progress / 100)
-            ).toFixed(2);
-
-            callback({
-              datasetId: datasetId,
-              progress: totalProgress == 100.0 ? 100 : totalProgress,
-              status: `Uploading part ${parseInt(index) + 1}/${totalParts}`
-            });
-          }
-        }
-        // Complete multipart upload
-        await this.#completeMultipartUpload(
-          orderId,
-          datasetId,
-          index,
-          uploadId,
-          finalParts
-        );
-      }
-      return 201;
-    } catch (error) {
-      throw new Error(
-        `Dataset upload attempt failed: ${error.message || error.toString()}`
-      );
     }
+    return "";
   };
 
   /**
@@ -894,7 +747,14 @@ class Neuropacs {
    */
   async newJob() {
     try {
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
       const url = `${this.serverUrl}/api/newJob/`;
+
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
@@ -927,39 +787,403 @@ class Neuropacs {
   }
 
   /**
-   * Upload dataset
-   * @param {Array<File>} dataset Array of File objects
-   * @param {String} orderId Base64 orderId (optional)
-   * @param {String} datasetId Base64 datasetId (optional)
-   * @param {Function} callback Callback for progress updates
-   * @returns {Number} Upload status code.
+   * Upload a dataset from a file object array
+   * @param {String} orderId Unique base64 identifier for the order.
+   * @param {File[]} fileArray Array containing File objects
+   * @param {Function} callback Callback function invoked with upload progress.
+   * @returns {Promise<Object>} A promise that resolves to the response of the upload operation.
    */
-  async uploadDataset({ dataset, orderId = null, datasetId = null, callback }) {
+  async uploadDatasetFromFileArray({ orderId, fileArray, callback = null }) {
     try {
-      // Attempt upload
-      await this.#attemptUploadDataset(dataset, orderId, datasetId, callback);
-      // Return success
-      return { datasetId: datasetId, state: "success" };
+      if (!fileArray || !orderId) {
+        throw new Error("Parameter is missing");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
+      if (!fileArray instanceof FileList) {
+        throw new Error(`Dataset must be an array of files`);
+      }
+
+      //load JSZip
+      await this.#loadScript(
+        "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+      );
+
+      const filenamesSet = new Set(); // Set to hold filenames (to detect duplicates)
+
+      let filesUploaded = 0; // Counts number of files uploaded
+      let curZipSize = 0; // Counts size of current zip file
+      let partIndex = 1; // Counts index of zip file
+
+      let jsZip = new JSZip(); // New JSZip instance
+
+      for (let f = 0; f < fileArray.length; f++) {
+        // Check if each object is a File
+        if (!fileArray[f] instanceof File) {
+          throw new Error(`Invalid object in datset`);
+        }
+
+        // Get name of the current file
+        let curFilename = fileArray[f].name;
+        const curFileSize = fileArray[f].size;
+
+        // Ensure a unique filename
+        const unqiueFilename = this.#ensureUniqueName(
+          filenamesSet,
+          curFilename
+        );
+
+        // If next chunk size will be larger than max, start next chunk
+        let nextZipSize = curZipSize + curFileSize;
+        if (nextZipSize > this.maxZipSize) {
+          // Create a blob object for zip file contents
+          const blob = await jsZip.generateAsync({ type: "blob" });
+
+          // Calculate zip index
+          const zipIndex = partIndex - 1;
+
+          // Start a new multipart upload
+          const uploadId = await this.#newMultipartUpload(
+            orderId,
+            String(zipIndex),
+            orderId
+          );
+
+          // Upload part
+          const ETag = await this.#uploadPart(
+            uploadId,
+            orderId,
+            String(zipIndex),
+            orderId,
+            partIndex,
+            blob
+          );
+
+          // Complete multipart upload
+          await this.#completeMultipartUpload(
+            orderId,
+            orderId,
+            String(zipIndex),
+            uploadId,
+            [{ PartNumber: partIndex, ETag: ETag }]
+          );
+
+          jsZip = new JSZip(); // New JSZip instance
+
+          // Reset current zip size
+          curZipSize = 0;
+
+          // True, increment part number
+          partIndex++;
+        }
+        // Add file to zip
+        jsZip.file(unqiueFilename, fileArray[f], { binary: true });
+        // Add file size to total zip size
+        curZipSize += curFileSize;
+
+        // Increment files uploaded
+        filesUploaded++;
+
+        // Call progress callback
+        if (callback) {
+          // const fileProcessed = f + 1;
+          const progress = parseFloat(
+            ((filesUploaded / fileArray.length) * 100).toFixed(2)
+          );
+
+          callback({
+            orderId: orderId,
+            progress: parseFloat(progress),
+            status: `Uploading file ${filesUploaded}/${fileArray.length}`
+          });
+        }
+      }
+
+      if (curZipSize > 0) {
+        // Upload remaining files
+
+        // Create a blob object for zip file contents
+        const blob = await jsZip.generateAsync({ type: "blob" });
+
+        // Calculate zip index
+        const zipIndex = partIndex - 1;
+
+        // Start a new multipart upload
+        const uploadId = await this.#newMultipartUpload(
+          orderId,
+          String(zipIndex),
+          orderId
+        );
+
+        // Upload part
+        const ETag = await this.#uploadPart(
+          uploadId,
+          orderId,
+          String(zipIndex),
+          orderId,
+          partIndex,
+          blob
+        );
+
+        // Complete multipart upload
+        await this.#completeMultipartUpload(
+          orderId,
+          orderId,
+          String(zipIndex),
+          uploadId,
+          [{ PartNumber: partIndex, ETag: ETag }]
+        );
+      }
+
+      // Return final upload status
+      return true;
     } catch (error) {
       throw new Error(
-        `Dataset upload failed: ${error.message || error.toString()}`
+        `Error uploading study from path: ${error.message || error.toString()}`
       );
     }
   }
 
   /**
-   * Run a job
-   * @param {String} productName Product to be executed
-   * @param {String} orderId Base64 order Id (optional)
+   * Retrieve a DICOM study from a DICOMweb server and upload.
+   *
+   * @param {string} orderId - Unique base64 identifier for the order.
+   * @param {string} dicomWebBaseUrl - Base URL of the DICOMweb server (e.g., 'http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs').
+   * @param {string} studyUid - Unique Study Instance UID of the study to be retrieved.
+   * @param {string} [username] - Username for basic authentication (if required).
+   * @param {string} [password] - Password for basic authentication (if required).
+   * @param {function} [callback] - Callback function invoked with upload progress.
+   * @returns {Promise<boolean>} - Boolean indicating upload status.
+   */
+  async uploadDatasetFromDicomWeb({
+    orderId,
+    dicomWebBaseUrl,
+    studyUid,
+    username = null,
+    password = null,
+    callback = null
+  }) {
+    try {
+      if (!orderId || !dicomWebBaseUrl || !studyUid) {
+        throw new Error("Parameter is missing");
+      }
 
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
+      //load JSZip
+      await this.#loadScript(
+        "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+      );
+      //load DICOMweb client
+      await this.#loadScript("https://unpkg.com/dicomweb-client");
+
+      let dicomWebClient;
+      // Create a DICOMweb client
+      if (username && password) {
+        // w/ auth
+        dicomWebClient = new DICOMwebClient.api.DICOMwebClient({
+          url: dicomWebBaseUrl,
+          username: username,
+          password: password
+        });
+      } else {
+        // w/out auth
+        dicomWebClient = new DICOMwebClient.api.DICOMwebClient({
+          url: dicomWebBaseUrl
+        });
+      }
+
+      // Update callback
+      if (callback) {
+        callback({
+          order_id: orderId,
+          progress: 0,
+          status: `Retrieving instances from DICOMweb for study ${studyUid}`
+        });
+      }
+
+      // Get the instances associated with the study
+      const instances = await dicomWebClient.retrieveStudy({
+        studyInstanceUID: studyUid
+      });
+
+      // Update callback
+      if (callback) {
+        callback({
+          order_id: orderId,
+          progress: 100,
+          status: `Retrieving instances from DICOMweb for study ${studyUid}`
+        });
+      }
+
+      if (!instances || instances.length === 0) {
+        throw new Error(
+          `No instances recieved from DICOMweb for study ${studyUid}`
+        );
+      }
+
+      // Track current zip file size
+      let curZipSize = 0;
+
+      // Create a new JSZip instance
+      let zip = new JSZip();
+
+      // Total number of instances
+      const totalInstances = instances.length;
+
+      // Track current part number
+      let partNumber = 1;
+
+      // Iterate through instances
+      for (let i = 0; i < instances.length; i++) {
+        let instanceData = instances[i];
+
+        // Generate a filename
+        const uniqueFilename = this.#generateUniqueUUID();
+
+        // instanceData is already an ArrayBuffer!
+        const dataBytes = instanceData;
+
+        // Get the file size
+        const curFileSize = dataBytes.byteLength;
+
+        // Check if max size exceeded
+        const nextZipSize = curZipSize + curFileSize;
+
+        // If max size exceeded OR on last file, upload
+        if (nextZipSize > this.maxZipSize) {
+          // Generate the zip content
+          const zipContent = await zip.generateAsync({ type: "blob" });
+
+          // Get zip index
+          const zipIndex = partNumber - 1;
+
+          // Get upload_id for multipart upload
+          const uploadId = await this.#newMultipartUpload(
+            orderId,
+            String(zipIndex),
+            orderId
+          );
+
+          // Upload the zip file
+          const eTag = await this.#uploadPart(
+            uploadId,
+            orderId,
+            String(zipIndex),
+            orderId,
+            partNumber,
+            zipContent
+          );
+
+          // Complete multipart upload
+          await this.#completeMultipartUpload(
+            orderId,
+            orderId,
+            String(zipIndex),
+            uploadId,
+            [{ PartNumber: partNumber, ETag: eTag }]
+          );
+
+          // Reset zip and curZipSize
+          zip = new JSZip();
+
+          // Reset current zip size
+          curZipSize = 0;
+
+          // Increment part number
+          partNumber += 1;
+        }
+
+        // Add the current instance to the zip
+        zip.file(uniqueFilename, dataBytes);
+
+        // Increment zip size
+        curZipSize += curFileSize;
+
+        // Update callback
+        if (callback) {
+          let progress = ((i + 1) / totalInstances) * 100;
+          progress = Math.round(progress * 100) / 100; // Round to two decimal places
+          progress = progress === 100 ? 100 : progress;
+          callback({
+            order_id: orderId,
+            progress: progress,
+            status: `Uploaded instance ${i + 1}/${instances.length}`
+          });
+        }
+      }
+
+      if (curZipSize > 0) {
+        // Generate the zip content
+        const zipContent = await zip.generateAsync({ type: "blob" });
+
+        // Get zip index
+        const zipIndex = partNumber - 1;
+
+        // Get upload_id for multipart upload
+        const uploadId = await this.#newMultipartUpload(
+          orderId,
+          String(zipIndex),
+          orderId
+        );
+
+        // Upload the zip file
+        const eTag = await this.#uploadPart(
+          uploadId,
+          orderId,
+          String(zipIndex),
+          orderId,
+          partNumber,
+          zipContent
+        );
+
+        // Complete multipart upload
+        await this.#completeMultipartUpload(
+          orderId,
+          orderId,
+          String(zipIndex),
+          uploadId,
+          [{ PartNumber: partNumber, ETag: eTag }]
+        );
+      }
+
+      return true;
+    } catch (error) {
+      throw new Error(
+        `Error uploading study from DICOMweb: ${
+          error.message || error.toString()
+        }`
+      );
+    }
+  }
+
+  /**
+   * Run a job for a specified order with a specified product
+   * @param {String} orderId Unique base64 identifier for the order.
+   * @param {String} productName Product to be executed
    * @returns {Number} Job run status code
    */
-  async runJob({ productName, orderId = null }) {
-    if (orderId == null) {
-      orderId = this.orderId;
-    }
-
+  async runJob({ orderId, productName }) {
     try {
+      if (!orderId || !productName) {
+        throw new Error("Parameter is missing");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
       const url = `${this.serverUrl}/api/runJob/`;
       const headers = {
         "Content-Type": "text/plain",
@@ -996,16 +1220,23 @@ class Neuropacs {
   }
 
   /**
-   * Check job status
-   * @param {String} orderId Base64 order_id (optional)
+   * Check job status for a specified order
+   * @param {String} orderId Unique base64 identifier for the order.
   
    * @returns {Number} Job status message
    */
-  async checkStatus({ orderId = null }) {
+  async checkStatus({ orderId }) {
     try {
-      if (orderId == null) {
-        orderId = this.orderId;
+      if (!orderId) {
+        throw new Error("Parameter is missing");
       }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
       const url = `${this.serverUrl}/api/checkStatus/`;
       const headers = {
         "Content-Type": "text/plain",
@@ -1046,16 +1277,21 @@ class Neuropacs {
 
   /**
    * Get job results
+   * @param {String} orderId Unique base64 identifier for the order.
    * @param {String} format Base64 AES key
-   * @param {String} orderId Base64 connection_id(optional)
    * @param {String} dataType Type of data to be returned (defaults to "raw")
-
-   * @returns  AES encrypted file data in specified format
+   * @returns Result data in specified format
    */
-  async getResults({ format, orderId = null, dataType = "raw" }) {
+  async getResults({ orderId, format, dataType = "raw" }) {
     try {
-      if (orderId == null) {
-        orderId = this.orderId;
+      if (!orderId || !format || !dataType) {
+        throw new Error("Parameter is missing");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
       }
 
       const url = `${this.serverUrl}/api/getResults/`;
@@ -1073,9 +1309,7 @@ class Neuropacs {
 
       // Check for invalid format
       if (!validFormats.includes(format)) {
-        throw new Error(
-          `Invalid format! Valid formats include: "txt", "json", "xml", "png".`
-        );
+        throw new Error(`Invalid format`);
       }
 
       const body = {
@@ -1121,13 +1355,13 @@ class Neuropacs {
         return rawData;
       } else if (dataType === "blob") {
         switch (format) {
-          case "TXT":
+          case "txt":
             return new Blob([rawData], { type: "text/plain" });
-          case "JSON":
+          case "json":
             return new Blob([rawData], { type: "application/json" });
-          case "XML":
+          case "xml":
             return new Blob([rawData], { type: "application/xml" });
-          case "PNG":
+          case "png":
             return new Blob([rawData], { type: "image/png" });
         }
       } else {
@@ -1140,4 +1374,5 @@ class Neuropacs {
     }
   }
 }
+
 window.Neuropacs = Neuropacs;
