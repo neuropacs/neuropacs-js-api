@@ -137,12 +137,12 @@
 
   <span class="code-comment">// Upload a dataset from path</span>
   <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">upload_dataset_from_path</span>({
-      orderId: orderId,
-      dataset: dataset,
-      callback: (info) => { <span class="code-comment">// optional progress callback</span>
-        console.log(info);
-      }
-    });
+    orderId: orderId,
+    dataset: dataset,
+    callback: (info) => { <span class="code-comment">// optional progress callback</span>
+      console.log(info);
+    }
+  });
 
   <span class="code-comment">// Start an order</span>
   <span class="code-keyword">const</span> order_start = <span class="code-keyword">await</span> npcs.<span class="code-function">runJob</span>({
@@ -181,15 +181,15 @@
 
   <span class="code-comment">// Upload a dataset from DICOMweb</span>
   <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">uploadDatasetFromDicomWeb</span>({
-      orderId: orderId,
-      dicomWebBaseUrl: dicomWebBaseUrl,
-      studyUid: studyUid,
-      username: username,
-      password: password,
-      callback: (info) => { <span class="code-comment">// optional progress callback</span>
-        console.log(info);
-      }
-    });
+    orderId: orderId,
+    dicomWebBaseUrl: dicomWebBaseUrl,
+    studyUid: studyUid,
+    username: username,
+    password: password,
+    callback: (info) => { <span class="code-comment">// optional progress callback</span>
+      console.log(info);
+    }
+  });
           </code></pre>
           </div>
         </section>
