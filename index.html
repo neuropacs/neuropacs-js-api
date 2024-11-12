@@ -109,7 +109,7 @@
           <h3>Initialization</h3>
           <p>Initalize the neuropacs™ API.</p>
           <pre class="code-container"><code class="language-shell">
-  <span class="code-comment"># Define neuropacs parameters</span>
+  <span class="code-comment">// Define neuropacs parameters</span>
   <span class="code-keyword">const</span> apiKey = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
   <span class="code-keyword">const</span> serverUrl = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
   <span class="code-keyword">const</span> productName = <span class="code-string">"Atypical/MSAp/PSP-v1.0"</span> <span class="code-comment"># Desired neuropacs™ product</span>
@@ -129,17 +129,17 @@
           <h3>Example</h3>
           <p>Working example using the neuropacs™ API.</p>
           <pre class="code-container"><code class="language-python">
-  <span class="code-comment"># Create a session</span>
+  <span class="code-comment">// Create a session</span>
   <span class="code-keyword">const</span> conn = <span class="code-keyword">await</span> npcs.<span class="code-function">connect();</span>
 
-  <span class="code-comment"># Create a new order</span>
+  <span class="code-comment">// Create a new order</span>
   <span class="code-keyword">const</span> order_id = <span class="code-keyword">await</span> npcs.<span class="code-function">newJob();</span>
 
-  <span class="code-comment"># Upload a dataset from path</span>
+  <span class="code-comment">// Upload a dataset from path</span>
   <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">upload_dataset_from_path</span>({
       orderId: orderId,
       dataset: dataset,
-      callback: (info) => {
+      callback: (info) => { <span class="code-comment">// optional progress callback</span>
         console.log(info);
       }
     });
@@ -186,7 +186,7 @@
       studyUid: studyUid,
       username: username,
       password: password,
-      callback: (info) => {
+      callback: (info) => { <span class="code-comment">// optional progress callback</span>
         console.log(info);
       }
     });
