@@ -944,7 +944,9 @@ class Neuropacs {
       return true;
     } catch (error) {
       throw new Error(
-        `Error uploading study from path: ${error.message || error.toString()}`
+        `Error uploading study from file array: ${
+          error.message || error.toString()
+        }`
       );
     }
   }
