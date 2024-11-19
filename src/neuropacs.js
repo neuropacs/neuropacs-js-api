@@ -463,7 +463,7 @@ class Neuropacs {
       } else if (formatOut === "string") {
         return decryptedText;
       } else if (formatOut === "Uint8Array") {
-        return bytes(decryptedText);
+        return decryptedBytes;
       } else {
         throw new Error(`Invalid output format`);
       }
