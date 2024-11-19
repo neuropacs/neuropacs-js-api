@@ -136,7 +136,7 @@
   <span class="code-keyword">const</span> order_id = <span class="code-keyword">await</span> npcs.<span class="code-function">newJob();</span>
 
   <span class="code-comment">// Upload a dataset from path</span>
-  <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">upload_dataset_from_path</span>({
+  <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">uploadDatasetFromFileArray</span>({
     orderId: orderId,
     dataset: dataset,
     callback: (info) => { <span class="code-comment">// optional progress callback</span>
