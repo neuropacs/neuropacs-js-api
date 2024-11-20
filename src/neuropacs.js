@@ -671,24 +671,6 @@ class Neuropacs {
     }
   };
 
-  // Helper function to parse boundary from Content-Type header
-  #parseBoundary = (contentType) => {
-    console.log(contentType);
-    const items = contentType.split(";");
-    for (let item of items) {
-      item = item.trim();
-      if (item.startsWith("boundary=")) {
-        let boundaryValue = item.slice("boundary=".length);
-        // Remove quotes if present
-        if (boundaryValue.startsWith('"') && boundaryValue.endsWith('"')) {
-          boundaryValue = boundaryValue.slice(1, -1);
-        }
-        return boundaryValue;
-      }
-    }
-    return "";
-  };
-
   /**
    * Public methods
    */
@@ -817,10 +799,12 @@ class Neuropacs {
       const filenamesSet = new Set(); // Set to hold filenames (to detect duplicates)
 
       let filesUploaded = 0; // Counts number of files uploaded
-      let curZipSize = 0; // Counts size of current zip file
+
       let partIndex = 1; // Counts index of zip file
 
       let jsZip = new JSZip(); // New JSZip instance
+
+      let zipBytes; // Holds byte content of zip file
 
       for (let f = 0; f < fileArray.length; f++) {
         // Check if each object is a File
@@ -830,7 +814,7 @@ class Neuropacs {
 
         // Get name of the current file
         let curFilename = fileArray[f].name;
-        const curFileSize = fileArray[f].size;
+        // const curFileSize = fileArray[f].size;
 
         // Ensure a unique filename
         const unqiueFilename = this.#ensureUniqueName(
@@ -838,12 +822,13 @@ class Neuropacs {
           curFilename
         );
 
-        // If next chunk size will be larger than max, start next chunk
-        let nextZipSize = curZipSize + curFileSize;
-        if (nextZipSize > this.maxZipSize) {
-          // Create a blob object for zip file contents
-          const blob = await jsZip.generateAsync({ type: "blob" });
+        // Get byte contents of zip file
+        zipBytes = await jsZip.generateAsync({
+          type: "blob"
+        });
 
+        // If zip contents larger than max size, process
+        if (zipBytes.size > this.maxZipSize) {
           // Calculate zip index
           const zipIndex = partIndex - 1;
 
@@ -861,7 +846,7 @@ class Neuropacs {
             String(zipIndex),
             orderId,
             partIndex,
-            blob
+            zipBytes
           );
 
           // Complete multipart upload
@@ -875,16 +860,11 @@ class Neuropacs {
 
           jsZip = new JSZip(); // New JSZip instance
 
-          // Reset current zip size
-          curZipSize = 0;
-
           // True, increment part number
           partIndex++;
         }
         // Add file to zip
         jsZip.file(unqiueFilename, fileArray[f], { binary: true });
-        // Add file size to total zip size
-        curZipSize += curFileSize;
 
         // Increment files uploaded
         filesUploaded++;
@@ -904,11 +884,8 @@ class Neuropacs {
         }
       }
 
-      if (curZipSize > 0) {
+      if (zipBytes.size > 0) {
         // Upload remaining files
-
-        // Create a blob object for zip file contents
-        const blob = await jsZip.generateAsync({ type: "blob" });
 
         // Calculate zip index
         const zipIndex = partIndex - 1;
@@ -927,7 +904,7 @@ class Neuropacs {
           String(zipIndex),
           orderId,
           partIndex,
-          blob
+          zipBytes
         );
 
         // Complete multipart upload
@@ -1033,11 +1010,10 @@ class Neuropacs {
         );
       }
 
-      // Track current zip file size
-      let curZipSize = 0;
-
       // Create a new JSZip instance
-      let zip = new JSZip();
+      let jsZip = new JSZip();
+
+      let zipBytes; // Holds byte content of zip file
 
       // Total number of instances
       const totalInstances = instances.length;
@@ -1055,17 +1031,11 @@ class Neuropacs {
         // instanceData is already an ArrayBuffer!
         const dataBytes = instanceData;
 
-        // Get the file size
-        const curFileSize = dataBytes.byteLength;
-
-        // Check if max size exceeded
-        const nextZipSize = curZipSize + curFileSize;
+        // Get byte contents of zip file
+        zipBytes = await jsZip.generateAsync({ type: "blob" });
 
         // If max size exceeded OR on last file, upload
-        if (nextZipSize > this.maxZipSize) {
-          // Generate the zip content
-          const zipContent = await zip.generateAsync({ type: "blob" });
-
+        if (zipBytes.size > this.maxZipSize) {
           // Get zip index
           const zipIndex = partNumber - 1;
 
@@ -1083,7 +1053,7 @@ class Neuropacs {
             String(zipIndex),
             orderId,
             partNumber,
-            zipContent
+            zipBytes
           );
 
           // Complete multipart upload
@@ -1095,21 +1065,15 @@ class Neuropacs {
             [{ PartNumber: partNumber, ETag: eTag }]
           );
 
-          // Reset zip and curZipSize
-          zip = new JSZip();
-
-          // Reset current zip size
-          curZipSize = 0;
+          // Reset zip
+          jsZip = new JSZip();
 
           // Increment part number
           partNumber += 1;
         }
 
         // Add the current instance to the zip
-        zip.file(uniqueFilename, dataBytes);
-
-        // Increment zip size
-        curZipSize += curFileSize;
+        jsZip.file(uniqueFilename, dataBytes);
 
         // Update callback
         if (callback) {
@@ -1124,10 +1088,7 @@ class Neuropacs {
         }
       }
 
-      if (curZipSize > 0) {
-        // Generate the zip content
-        const zipContent = await zip.generateAsync({ type: "blob" });
-
+      if (zipBytes.size > 0) {
         // Get zip index
         const zipIndex = partNumber - 1;
 
@@ -1145,7 +1106,7 @@ class Neuropacs {
           String(zipIndex),
           orderId,
           partNumber,
-          zipContent
+          zipBytes
         );
 
         // Complete multipart upload
