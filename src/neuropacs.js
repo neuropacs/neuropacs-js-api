@@ -17,7 +17,7 @@ class Neuropacs {
     this.aesKey = null;
     this.originType = originType;
     this.connectionId = null;
-    this.maxZipSize = 15 * 1024 * 1024; // 10MB max zip file size
+    this.maxZipSize = 15 * 1024 * 1024; // 15MB max zip file size
   }
 
   /**
@@ -264,25 +264,6 @@ class Neuropacs {
         `Partitioning blob failed: ${error.message || error.toString()}`
       );
     }
-  };
-
-  /**
-   * Split array into partSize pieces for processing
-   * @param {*} array Array
-   * @param {*} partSize Part size
-   * @returns
-   */
-  #splitArray = (array, partSize) => {
-    if (partSize <= 0) {
-      throw new Error("Chunk size must be greater than 0");
-    }
-
-    const result = [];
-    for (let i = 0; i < array.length; i += partSize) {
-      const chunk = array.slice(i, i + partSize);
-      result.push(chunk);
-    }
-    return result;
   };
 
   /**
@@ -824,7 +805,8 @@ class Neuropacs {
 
         // Get byte contents of zip file
         zipBytes = await jsZip.generateAsync({
-          type: "blob"
+          type: "blob",
+          compression: "STORE"
         });
 
         // If zip contents larger than max size, process
@@ -864,7 +846,10 @@ class Neuropacs {
           partIndex++;
         }
         // Add file to zip
-        jsZip.file(unqiueFilename, fileArray[f], { binary: true });
+        jsZip.file(unqiueFilename, fileArray[f], {
+          compression: "STORE",
+          binary: true
+        });
 
         // Increment files uploaded
         filesUploaded++;
