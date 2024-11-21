@@ -1017,7 +1017,10 @@ class Neuropacs {
         const dataBytes = instanceData;
 
         // Get byte contents of zip file
-        zipBytes = await jsZip.generateAsync({ type: "blob" });
+        zipBytes = await jsZip.generateAsync({
+          type: "blob",
+          compression: "STORE"
+        });
 
         // If max size exceeded OR on last file, upload
         if (zipBytes.size > this.maxZipSize) {
@@ -1058,7 +1061,10 @@ class Neuropacs {
         }
 
         // Add the current instance to the zip
-        jsZip.file(uniqueFilename, dataBytes);
+        jsZip.file(uniqueFilename, dataBytes, {
+          compression: "STORE",
+          binary: true
+        });
 
         // Update callback
         if (callback) {
