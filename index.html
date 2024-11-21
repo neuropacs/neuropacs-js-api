@@ -164,6 +164,34 @@
           </code></pre>
         </div>
 
+        <div class="code-section">
+          <h3>Example viewing a PNG result</h3>
+          <p>Download a PNG result file and view it.</p>
+          <pre class="code-container"><code class="language-javascript">
+  <span class="code-comment">// Retrieve job results in 'PNG' format as a blob</span>
+  <span class="code-keyword">const</span> results = <span class="code-keyword">await</span> npcs.<span class="code-function">getResults</span>({
+      orderId: orderId
+      format: <span class="code-string">"PNG"</span>,
+      dataType: <span class="code-string">"blob"</span>
+  });
+
+  <span class="code-comment">// Create a link element</span>
+  <span class="code-keyword">const</span> link = document.createElement(<span class="code-string">"a"</span>);
+  link.href = URL.<span class="code-function">createObjectURL</span>(blob);
+  link.download = filename;
+
+  <span class="code-comment">// Append link to the body (needed for Firefox)</span>
+  document.body.<span class="code-function">appendChild</span>(link);
+
+  <span class="code-comment">// Trigger the download</span> 
+  link.<span class="code-function">click</span>();
+
+  <span class="code-comment">// Remove the link</span> 
+  document.body.<span class="code-function">removeChild</span>(link);
+              </code></pre>
+            </section>
+            </div>
+
         <section id="dicom-web">
           <div class="code-section">
             <h3>DICOMweb Integration</h3>
