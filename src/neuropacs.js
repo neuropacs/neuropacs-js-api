@@ -841,7 +841,6 @@ class Neuropacs {
           // Reset jsZip and currentZipSize
           jsZip = new JSZip();
           currentZipSize = 0;
-          filenamesSet.clear(); // Reset filenames set
           partIndex++; // Increment partIndex for the next zip file
         }
 
