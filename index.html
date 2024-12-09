@@ -145,7 +145,7 @@
   });
 
   <span class="code-comment">// Start an order</span>
-  <span class="code-keyword">const</span> order_start = <span class="code-keyword">await</span> npcs.<span class="code-function">runJob</span>({
+  <span class="code-keyword">const</span> job = <span class="code-keyword">await</span> npcs.<span class="code-function">runJob</span>({
       orderId: orderId
       productName: productName
     });
@@ -197,12 +197,12 @@
             <h3>DICOMweb Integration</h3>
             <p>
               The API retrieves and processes images directly from
-              DICOMweb-compliant servers, enabling neuropacs™ analysis for
+              DICOMweb WADO-RS servers, enabling neuropacs™ analysis for
               streamlined diagnostic workflows.
             </p>
             <pre class="code-container"><code class="language-python">
-  <span class="code-comment">// Define DICOMweb parameters</span>
-  <span class="code-keyword">const</span> dicomWebBaseUrl = <span class="code-string">"http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs"</span>
+  <span class="code-comment">// Define DICOMweb WADO-RS parameters</span>
+  <span class="code-keyword">const</span> wadoUrl = <span class="code-string">"http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs"</span>
   <span class="code-keyword">const</span> studyUid = <span class="code-string">"1.3.12.2.1107.5.2.32.35162.30000022041820573832300000043"</span>
   <span class="code-keyword">const</span> username = <span class="code-string">"username"</span>
   <span class="code-keyword">const</span> password = <span class="code-string">"password"</span>
@@ -210,7 +210,7 @@
   <span class="code-comment">// Upload a dataset from DICOMweb</span>
   <span class="code-keyword">const</span> upload = <span class="code-keyword">await</span> npcs.<span class="code-function">uploadDatasetFromDicomWeb</span>({
     orderId: orderId,
-    dicomWebBaseUrl: dicomWebBaseUrl,
+    wadoUrl: wadoUrl,
     studyUid: studyUid,
     username: username,
     password: password,
