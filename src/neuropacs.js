@@ -1,6 +1,6 @@
 /*!
- * NeuroPACS v1.1.8
- * (c) 2024 Kerrick Cavanaugh
+ * neuropacs JavaScript API v1.1.8
+ * (c) 2024 neuropacs
  * Released under the MIT License.
  */
 
@@ -18,6 +18,19 @@ class Neuropacs {
     this.originType = originType;
     this.connectionId = null;
     this.maxZipSize = 15 * 1024 * 1024; // 15MB max zip file size
+
+    // Wrapped methods with retry (3 times, every 1000ms)
+    this.#newMultipartUpload = this.#withRetry(
+      this.#newMultipartUpload.bind(this),
+      3,
+      1000
+    );
+    this.#completeMultipartUpload = this.#withRetry(
+      this.#completeMultipartUpload.bind(this),
+      3,
+      1000
+    );
+    this.#uploadPart = this.#withRetry(this.#uploadPart.bind(this), 3, 1000);
   }
 
   /**
@@ -244,29 +257,6 @@ class Neuropacs {
   };
 
   /**
-   * Split blob into partSize pieces for processing
-   * @param {*} blob Blob object
-   * @param {*} partSize Part size in bytes
-   * @returns
-   */
-  #splitBlob = (blob, partSize) => {
-    try {
-      const parts = [];
-      let start = 0;
-      while (start < blob.size) {
-        const end = Math.min(start + partSize, blob.size);
-        parts.push(blob.slice(start, end));
-        start = end;
-      }
-      return parts;
-    } catch (error) {
-      throw new Error(
-        `Partitioning blob failed: ${error.message || error.toString()}`
-      );
-    }
-  };
-
-  /**
    * Padding for AES CTR
    * @param {*} data data to be padded
    * @param {*} blockSize block size of cipher
@@ -456,6 +446,32 @@ class Neuropacs {
   };
 
   /**
+   * Wrapper function to retry AWS request-based function multiple times if it fails.
+   * @param {*} fn Function to retry
+   * @param {*} maxRetries Maximum number of retries before giving up.
+   * @param {*} delay Delay in seconds between retries.
+   * @returns Wrapped function promise
+   */
+  #withRetry(fn, maxRetries = 3, delay = 1000) {
+    return async function (...args) {
+      let attempt = 0;
+      let lastError;
+      while (attempt < maxRetries) {
+        try {
+          return await fn(...args);
+        } catch (error) {
+          lastError = error;
+          attempt++;
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      }
+      throw lastError;
+    };
+  }
+
+  /**
    * Start new multipart upload
    * @param {String} datasetId Base64 datasetId
    * @param {Number} partIndex Index of zip file
@@ -587,6 +603,8 @@ class Neuropacs {
     partData
   ) => {
     try {
+      let response;
+
       const headers = {
         "Content-Type": "text/plain",
         "Connection-Id": this.connectionId,
@@ -608,14 +626,12 @@ class Neuropacs {
         "string"
       );
 
-      const response = await fetch(
-        `${this.serverUrl}/api/multipartPresignedUrl/`,
-        {
-          method: "POST",
-          headers: headers,
-          body: encryptedBody
-        }
-      );
+      // Retrieve a presigned url
+      response = await fetch(`${this.serverUrl}/api/multipartPresignedUrl/`, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
 
       if (!response.ok) {
         throw new Error(JSON.parse(await response.text()).error);
@@ -626,26 +642,28 @@ class Neuropacs {
 
       const presignedUrl = resJson.presignedUrl;
 
-      let fail = false;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const upload_res = await fetch(presignedUrl, {
-          method: "PUT",
-          body: partData
-        });
-
-        if (!upload_res.ok) {
-          fail = true;
-          failText = await upload_res.text();
-        } else {
-          const eTag = upload_res.headers.get("ETag");
-          return eTag;
-        }
+      if (!presignedUrl) {
+        throw new Error("Presigned URL not present in AWS response.");
       }
 
-      if (fail) {
-        throw new Error(`Upload failed after 3 attempts`);
+      // Put data to presigned url
+      response = await fetch(presignedUrl, {
+        method: "PUT",
+        body: partData
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
-    } catch (e) {
+
+      const eTag = response.headers.get("ETag");
+
+      if (!eTag) {
+        throw new Error("Etag header not present in AWS response.");
+      }
+
+      return eTag;
+    } catch (error) {
       throw new Error(
         `Upload part failed: ${error.message || error.toString()}`
       );
@@ -753,7 +771,7 @@ class Neuropacs {
    * Upload a dataset from a file object array
    * @param {String} orderId Unique base64 identifier for the order.
    * @param {FileList} fileArray Array containing File objects
-   * @param {Function} callback Callback function invoked with upload progress.
+   * @param {Function} [callback] Callback function invoked with upload progress.
    * @returns {Promise<Object>} A promise that resolves to the response of the upload operation.
    */
   async uploadDatasetFromFileArray({ orderId, fileArray, callback = null }) {
@@ -768,8 +786,14 @@ class Neuropacs {
         );
       }
 
-      if (!(fileArray instanceof FileList)) {
-        throw new Error(`Dataset must be an array of files`);
+      if (
+        !(fileArray instanceof FileList) &&
+        !(
+          Array.isArray(fileArray) &&
+          fileArray.every((file) => file instanceof File)
+        )
+      ) {
+        throw new Error(`Dataset must be an array of files or a FileList`);
       }
 
       // Load JSZip
@@ -784,11 +808,6 @@ class Neuropacs {
       let currentZipSize = 0; // Keep track of current zip size
 
       for (let f = 0; f < fileArray.length; f++) {
-        // Check if each object is a File
-        if (!(fileArray[f] instanceof File)) {
-          throw new Error(`Invalid object in dataset`);
-        }
-
         // Get name of the current file
         const curFile = fileArray[f];
         const curFilename = curFile.name;
@@ -918,10 +937,10 @@ class Neuropacs {
   }
 
   /**
-   * Retrieve a DICOM study from a DICOMweb server and upload.
+   * Upload a dataset via DICOMweb WADO-RS protocol.
    *
    * @param {string} orderId - Unique base64 identifier for the order.
-   * @param {string} dicomWebBaseUrl - Base URL of the DICOMweb server (e.g., 'http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs').
+   * @param {string} wadoUrl - URL to access DICOM images via the WADO-RS protocol (e.g. 'http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs').
    * @param {string} studyUid - Unique Study Instance UID of the study to be retrieved.
    * @param {string} [username] - Username for basic authentication (if required).
    * @param {string} [password] - Password for basic authentication (if required).
@@ -930,14 +949,14 @@ class Neuropacs {
    */
   async uploadDatasetFromDicomWeb({
     orderId,
-    dicomWebBaseUrl,
+    wadoUrl,
     studyUid,
     username = null,
     password = null,
     callback = null
   }) {
     try {
-      if (!orderId || !dicomWebBaseUrl || !studyUid) {
+      if (!orderId || !wadoUrl || !studyUid) {
         throw new Error("Parameter is missing");
       }
 
@@ -959,14 +978,14 @@ class Neuropacs {
       if (username && password) {
         // w/ auth
         dicomWebClient = new DICOMwebClient.api.DICOMwebClient({
-          url: dicomWebBaseUrl,
+          url: wadoUrl,
           username: username,
           password: password
         });
       } else {
         // w/out auth
         dicomWebClient = new DICOMwebClient.api.DICOMwebClient({
-          url: dicomWebBaseUrl
+          url: wadoUrl
         });
       }
 

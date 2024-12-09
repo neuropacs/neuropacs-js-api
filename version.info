@@ -1,0 +1,10 @@
+v1.1.8:
+    - Add 'withRetry' function wrapper for AWS requests to retry in case of failure
+        - Added wrappers to API constructor
+        - Remove retry logic from 'uploadPart' - not necessary with new wrapper
+        - Add wrapper to 'newMultipartUpload', 'completeMultipartUpload', 'uploadPart' function calls
+    - Update input validation for 'uploadDatasetFromFileArray'
+    - Change "dicomWebBaseUrl" -> "wadoUrl"
+    - Update param description for wadoUrl
+    - Remove "splitBlob" (not used)
+    - Add existence checks for Etag and presignedUrl
