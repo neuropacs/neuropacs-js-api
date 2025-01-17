@@ -1,0 +1,23 @@
+{
+  "name": "my-neuropacs-package",
+  "version": "1.0.0",
+  "description": "Neuropacs JavaScript API",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "type": "module",
+  "scripts": {
+    "build:cjs": "babel src --out-file dist/index.cjs.js --env-name cjs",
+    "build:esm": "babel src --out-file dist/index.esm.js --env-name esm",
+    "build": "npm run build:cjs && npm run build:esm",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.0.0",
+    "@babel/cli": "^7.0.0",
+    "@babel/preset-env": "^7.0.0",
+    "jest": "^27.0.0"
+  }
+}

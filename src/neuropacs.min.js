@@ -1,6 +1,6 @@
 //prettier-ignore
 /*!
- * neuropacs JavaScript API v1.1.8
+ * neuropacs JavaScript API v1.1.9
  * (c) 2024 neuropacs
  * Released under the MIT License.
  */

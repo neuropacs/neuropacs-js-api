@@ -1,8 +1,9 @@
 /*!
- * neuropacs JavaScript API v1.1.8
+ * neuropacs JavaScript API v1.1.9
  * (c) 2024 neuropacs
  * Released under the MIT License.
  */
+const crypto = require("crypto");
 
 class Neuropacs {
   /**
@@ -97,7 +98,8 @@ class Neuropacs {
   #generateAesKey = () => {
     try {
       const aesKey = new Uint8Array(16);
-      window.crypto.getRandomValues(aesKey);
+      crypto.randomFillSync(aesKey);
+      // window.crypto.getRandomValues(aesKey);
       const aesKeyBase64 = btoa(String.fromCharCode.apply(null, aesKey));
       return aesKeyBase64;
     } catch (error) {
@@ -1358,4 +1360,4 @@ class Neuropacs {
   }
 }
 
-window.Neuropacs = Neuropacs;
+export default Neuropacs;
