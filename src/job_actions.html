@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- NeuroPACS SDK -->
+    <!-- <script src="https://d3tequ3xv41td3.cloudfront.net/js/neuropacs.min.js"></script> -->
+    <script src="./neuropacs.js"></script>
+
+    <title>NeuroPACS SDK Job Actions Example</title>
+  </head>
+  <body>
+    <script>
+      async function main() {
+        const apiKey = "generate_api_key";
+
+        const serverUrl =
+          "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox";
+
+        const productName = "PD/MSA/PSP-v1.0";
+        const client = "API";
+        const format = "JSON";
+
+        const npcs = Neuropacs.init({ serverUrl: serverUrl, apiKey: apiKey });
+
+        const conn = await npcs.connect();
+        console.log(conn);
+
+        // CREATE A NEW JOB
+        const orderId = await npcs.newJob();
+        console.log(orderId);
+
+        // Then create a File from the Blob
+        const file = new File(
+          [new Blob(["DICOM"], { type: "application/dicom" })],
+          "example.dcm",
+          { type: "application/dicom", lastModified: new Date() }
+        );
+        // const dataset = await readDirectory("./tests/test_dataset");
+        // console.log(dataset);
+        const uploadStatus = await npcs.uploadDatasetFromFileArray({
+          orderId: orderId,
+          fileArray: [file],
+          callback: (info) => {
+            console.log(info);
+          }
+        });
+
+        console.log(uploadStatus);
+
+        // // RUN A JOB
+        // const order = await npcs.runJob({
+        //   productName: productName,
+        //   orderId: "b0012fbc-abc3-4649-8fc1-9f2bb925ca97"
+        // });
+        // console.log(order);
+
+        // const status = await npcs.checkStatus({
+        //   orderId: "TEST"
+        // });
+        // console.log(status);
+
+        // const results = await npcs.getResults({
+        //   format: "xml",
+        //   orderId: "TEST",
+        //   dataType: "raw"
+        // });
+        // console.log(results);
+
+        // const report = await npcs.getReport({
+        //   format: "txt",
+        //   startDate: "1/9/2025",
+        //   endDate: "1/10/2025"
+        // });
+        // console.log(report);
+
+        //   // if (format == "PNG") {
+        //   // Convert response to a blob
+        //   // const blob = new Blob([results]);
+
+        //   // // Create a link element
+        //   // const link = document.createElement("a");
+
+        //   // // Create a URL for the blob
+        //   // const urlObject = URL.createObjectURL(results);
+
+        //   // // Set the link attributes
+        //   // link.href = urlObject;
+        //   // link.download = `downloaded_image.${format.toLowerCase()}`; // Specify the filename
+
+        //   // // Append the link to the document
+        //   // document.body.appendChild(link);
+
+        //   // link.click();
+
+        //   // document.body.removeChild(link);
+
+        //   // URL.revokeObjectURL(urlObject);
+
+        //   // console.log("Download successful");
+        // }
+        // const serverUrl =
+        //   "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev";
+
+        // function generateRandomString(length) {
+        //   let result = "";
+        //   const characters =
+        //     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        //   const charactersLength = characters.length;
+        //   for (let i = 0; i < length; i++) {
+        //     result += characters.charAt(
+        //       Math.floor(Math.random() * charactersLength)
+        //     );
+        //   }
+        //   return result;
+        // }
+
+        // let c = 0;
+        // let c_all = 0;
+
+        // function run() {
+        //   let j = 0;
+        //   for (let i = 0; i < 1; i++) {
+        //     const npcs = Neuropacs.init({
+        //       serverUrl: serverUrl,
+        //       apiKey: apiKey
+        //     });
+        //     const conn = npcs
+        //       .connect()
+        //       .then((conn) => {
+        //         console.log(conn);
+        //       })
+        //       .catch((e) => {
+        //         console.log(e);
+        //       });
+        //     // const npcs = Neuropacs.init({
+        //   serverUrl: serverUrl,
+        //   apiKey: generateRandomString(32)
+        // });
+        // const conn = npcs
+        //   .connect()
+        //   .then(() => {
+        //     console.log("ok");
+        //   })
+        //   .catch((e) => {
+        //     console.log(e);
+        //   });
+        // }
+      }
+      // ();
+
+      main();
+    </script>
+  </body>
+</html>
