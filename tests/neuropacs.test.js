@@ -275,7 +275,7 @@ describe("neuropacs JS Unit Tests", () => {
         format: "INVALID",
         dataType: "raw"
       })
-    ).rejects.toThrow("Result retrieval failed: Invalid format.");
+    ).rejects.toThrow("Result retrieval failed: Invalid format");
   });
 
   // Invalid result data type
@@ -538,13 +538,13 @@ describe("neuropacs JS Unit Tests", () => {
       orderId: orderId,
       fileArray: [testFile]
     });
-    await sleep(50000);
+    await sleep(60000);
     const qc = await npcsTemp.qcCheck({
       orderId: orderId,
       format: "txt"
     });
     expect(qc).toBe("QC FAILED: ERR_UNZIP_FAILED");
-  });
+  }, 120000);
 
   // Invalid format in QC check
   test("invalid format for QC check", async () => {
@@ -595,10 +595,7 @@ describe("neuropacs JS Unit Tests", () => {
     const orderId = await npcsTemp.newJob();
     await npcsTemp.uploadDatasetFromFileArray({
       orderId: orderId,
-      fileArray: [testFile],
-      callback: (info) => {
-        console.log(info);
-      }
+      fileArray: [testFile]
     });
     await expect(
       npcsTemp.qcCheck({

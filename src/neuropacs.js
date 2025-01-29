@@ -1386,6 +1386,98 @@ class Neuropacs {
     }
   }
 
+  async getReport({ format, startDate, endDate }) {
+    try {
+      if (!format || !startDate || !endDate) {
+        throw new Error("Parameter is missing.");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
+      // Check if dates are valid
+      let startInputDate, endInputDate;
+      try {
+        startInputDate = new Date(startDate);
+        endInputDate = new Date(endDate);
+
+        // Ensure valid dates and the correct format
+        if (
+          isNaN(startInputDate.getTime()) ||
+          isNaN(endInputDate.getTime()) ||
+          !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(startDate) ||
+          !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(endDate)
+        ) {
+          throw new Error();
+        }
+      } catch (e) {
+        throw new Error("Invalid date format (MM/DD/YYYY).");
+      }
+
+      // Check if dates are in the future or invalid
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+
+      if (endInputDate > today || startInputDate > today) {
+        throw new Error("Provided date must not exceed current date.");
+      } else if (startInputDate > endInputDate) {
+        throw new Error("startDate must not exceed endDate.");
+      }
+
+      const url = `${this.serverUrl}/api/getReport/`;
+
+      const headers = {
+        "Content-Type": "text/plain",
+        "Connection-Id": this.connectionId,
+        "Origin-Type": this.originType
+      };
+
+      format = format.toLowerCase();
+
+      const validFormats = ["txt", "email", "json"];
+      if (!validFormats.includes(format)) {
+        throw new Error("Invalid format.");
+      }
+
+      const body = {
+        startDate: startDate,
+        endDate: endDate,
+        format: format
+      };
+
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
+      }
+
+      const text = await response.text();
+      const resString = await this.#decryptAesCtr(text, this.aesKey, "string");
+
+      if (format == "json") {
+        return JSON.parse(resString);
+      } else {
+        return resString;
+      }
+    } catch (error) {
+      throw new Error(`Report retrieval failed: ${error.message}`);
+    }
+  }
+
   /**
    * QC/Compliance check on dataset
    * @param {String} orderId Unique base64 identifier for the order.

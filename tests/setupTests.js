@@ -1,5 +1,4 @@
 global.fetch = require("cross-fetch");
-// require("jest-fetch-mock").enableMocks();
 
 const crypto = require("crypto").webcrypto;
 global.crypto.subtle = crypto.subtle;
