@@ -189,8 +189,11 @@ test("successful run QC check", async () => {
     serverUrl: "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
     apiKey: "generate_api_key"
   });
-  await npcsTemp.connect();
+  console.log("INIT");
+  const conn = await npcsTemp.connect();
+  console.log(conn);
   const orderId = await npcsTemp.newJob();
+  console.log(orderId);
   const upload = await npcsTemp.uploadDatasetFromFileArray({
     orderId: orderId,
     fileArray: [testFile],
