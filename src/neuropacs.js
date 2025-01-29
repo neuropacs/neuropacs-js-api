@@ -1321,7 +1321,7 @@ class Neuropacs {
 
       // Check for invalid format
       if (!validFormats.includes(format)) {
-        throw new Error(`Invalid format`);
+        throw new Error(`Invalid format.`);
       }
 
       const body = {
@@ -1412,7 +1412,7 @@ class Neuropacs {
 
       // Check for invalid format
       if (!validFormats.includes(format)) {
-        throw new Error(`Invalid format`);
+        throw new Error(`Invalid format.`);
       }
 
       const url = `${this.serverUrl}/api/qcCheck/`;
