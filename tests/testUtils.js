@@ -19,6 +19,12 @@ const productId = "Atypical/MSAp/PSP-v1.0";
 
 const originType = "JS Integration Tests";
 
+const testFile = new File(
+  [new Blob(["DICOM"], { type: "application/dicom" })],
+  "example.dcm",
+  { type: "application/dicom", lastModified: new Date() }
+);
+
 const isValidUuid4 = (value) => {
   return uuidValidate(value) && uuidVersion(value) === 4;
 };
@@ -149,5 +155,6 @@ module.exports = {
   noUsageRemainingApiKey,
   originType,
   invalidOrderId,
-  productId
+  productId,
+  testFile
 };
