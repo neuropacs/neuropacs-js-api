@@ -184,11 +184,12 @@ test("invalid result data type for result retrieval", async () => {
 
 // Successful run QC check (DCM2NIIX error)
 test("successful run QC check", async () => {
-  await npcsAdmin.connect();
-  const status = await npcsAdmin.getResults({
-    orderId: "TEST",
-    format: "json",
-    dataType: "raw"
+  const npcsTemp = Neuropacs.init({
+    serverUrl: "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
+    apiKey: "generate_api_key"
   });
+  await npcsTemp.connect();
+  const orderId = await npcsTemp.newJob();
+
   expect(isValidResultRawJson(status)).toBe(true);
 });
