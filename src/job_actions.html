@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- NeuroPACS SDK -->
+    <script src="./neuropacs.js"></script>
+    <!-- <script src="https://d3tequ3xv41td3.cloudfront.net/js/neuropacs.min.js"></script> -->
+
+    <title>NeuroPACS SDK Job Actions Example</title>
+  </head>
+  <body>
+    <!-- Input element to select a folder -->
+    <input type="file" id="folderInput" webkitdirectory multiple />
+
+    <script>
+      async function main() {
+        const apiKey = "generate_api_key";
+
+        const serverUrl =
+          "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox";
+
+        const productName = "PD/MSA/PSP-v1.0";
+        const client = "API";
+        const format = "JSON";
+
+        // Wait for the user to select a folder
+        const folderInput = document.getElementById("folderInput");
+        folderInput.addEventListener("change", async function (event) {
+          const files = event.target.files;
+
+          const npcs = Neuropacs.init({ serverUrl: serverUrl, apiKey: apiKey });
+
+          const conn = await npcs.connect();
+          console.log(conn);
+
+          // // CREATE A NEW JOB
+          // const orderID = await npcs.newJob();
+          // console.log(orderID);
+
+          // console.time("Upload time");
+          // const datasetID = await npcs.uploadDatasetFromFileArray({
+          //   orderId: orderID,
+          //   fileArray: files,
+          //   callback: (info) => {
+          //     console.log(info);
+          //   }
+          // });
+          // console.log(datasetID);
+          // console.timeEnd("Upload time");
+
+          const qc = await npcs.qcCheck({
+            orderId: "1620cdc6-d709-46f7-a80f-d08e122a7408",
+            format: "csv"
+          });
+          console.log(qc);
+
+          // console.time("Upload time");
+          // const datasetID = await npcs.uploadDatasetFromDicomWeb({
+          //   orderId: orderID,
+          //   dicomWebBaseUrl:
+          //     "http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs",
+          //   studyUid:
+          //     "1.3.12.2.1107.5.2.32.35162.30000022041820573832300000043",
+          //   callback: (info) => {
+          //     console.log(info);
+          //   }
+          // });
+          // console.log(datasetID);
+          // console.timeEnd("Upload time");
+
+          // Continue with the rest of your code here
+        });
+      }
+      main();
+    </script>
+  </body>
+</html>

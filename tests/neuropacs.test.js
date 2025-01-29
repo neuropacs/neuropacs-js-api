@@ -181,3 +181,14 @@ test("invalid result data type for result retrieval", async () => {
     })
   ).rejects.toThrow("Result retrieval failed: Invalid data type.");
 });
+
+// Successful run QC check (DCM2NIIX error)
+test("successful run QC check", async () => {
+  await npcsAdmin.connect();
+  const status = await npcsAdmin.getResults({
+    orderId: "TEST",
+    format: "json",
+    dataType: "raw"
+  });
+  expect(isValidResultRawJson(status)).toBe(true);
+});

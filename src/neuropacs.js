@@ -531,6 +531,7 @@ class Neuropacs {
    * @param {Number} partIndex Index of zip file
    * @param {String} uploadId Base64 uploadId
    * @param {Object} uploadParts Uploaded parts object
+   * @param {int} finalPart Final part of dataset upload (0==no, 1==yes)
    * @returns status code
    */
   #completeMultipartUpload = async (
@@ -538,7 +539,8 @@ class Neuropacs {
     datasetId,
     zipIndex,
     uploadId,
-    uploadParts
+    uploadParts,
+    finalPart
   ) => {
     try {
       const url = `${this.serverUrl}/api/completeMultipartUpload/`;
@@ -554,7 +556,8 @@ class Neuropacs {
         uploadId: uploadId,
         uploadParts: uploadParts,
         zipIndex: zipIndex,
-        orderId: orderId
+        orderId: orderId,
+        finalPart: finalPart
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -849,13 +852,25 @@ class Neuropacs {
           );
 
           // Complete multipart upload
-          await this.#completeMultipartUpload(
-            orderId,
-            orderId,
-            String(zipIndex),
-            uploadId,
-            [{ PartNumber: 1, ETag: ETag }]
-          );
+          if (filesUploaded - 1 == fileArray.length) {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: 1, ETag: ETag }],
+              1
+            );
+          } else {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: 1, ETag: ETag }],
+              0
+            );
+          }
 
           // Reset jsZip and currentZipSize
           jsZip = new JSZip();
@@ -921,7 +936,8 @@ class Neuropacs {
           orderId,
           String(zipIndex),
           uploadId,
-          [{ PartNumber: 1, ETag: ETag }]
+          [{ PartNumber: 1, ETag: ETag }],
+          1
         );
       }
 
@@ -1067,13 +1083,25 @@ class Neuropacs {
           );
 
           // Complete multipart upload
-          await this.#completeMultipartUpload(
-            orderId,
-            orderId,
-            String(zipIndex),
-            uploadId,
-            [{ PartNumber: partNumber, ETag: eTag }]
-          );
+          if (i == totalInstances) {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: partNumber, ETag: eTag }],
+              1
+            );
+          } else {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: partNumber, ETag: eTag }],
+              0
+            );
+          }
 
           // Reset zip and currentZipSize
           jsZip = new JSZip();
@@ -1135,7 +1163,8 @@ class Neuropacs {
           orderId,
           String(zipIndex),
           uploadId,
-          [{ PartNumber: partNumber, ETag: eTag }]
+          [{ PartNumber: partNumber, ETag: eTag }],
+          1
         );
       }
 
@@ -1354,6 +1383,79 @@ class Neuropacs {
       throw new Error(
         `Result retrieval failed: ${error.message || error.toString()}`
       );
+    }
+  }
+
+  /**
+   * QC/Compliance check on dataset
+   * @param {String} orderId Unique base64 identifier for the order.
+   * @param {String} format Format 
+  
+   * @returns {String} QC result
+   */
+  async qcCheck({ orderId, format }) {
+    try {
+      if (!orderId || !format) {
+        throw new Error("Parameter is missing");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
+      // Make format case insensative
+      format = String(format).toLowerCase();
+
+      const validFormats = ["txt", "csv", "json"];
+
+      // Check for invalid format
+      if (!validFormats.includes(format)) {
+        throw new Error(`Invalid format`);
+      }
+
+      const url = `${this.serverUrl}/api/qcCheck/`;
+      const headers = {
+        "Content-Type": "text/plain",
+        "Connection-Id": this.connectionId,
+        "Origin-Type": this.originType
+      };
+
+      const body = {
+        orderId: orderId,
+        format: format
+      };
+
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
+      }
+
+      const text = await response.text();
+
+      let out;
+      if (format == "json") {
+        out = await this.#decryptAesCtr(text, this.aesKey, "JSON");
+      } else {
+        out = await this.#decryptAesCtr(text, this.aesKey, "string");
+      }
+
+      return out;
+    } catch (error) {
+      throw new Error(`QC check failed: ${error.message || error.toString()}`);
     }
   }
 }
