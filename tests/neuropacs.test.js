@@ -25,7 +25,6 @@ const {
  * Tests to do
  *  - admin key access to non admin job info (should succeed)
  *  - non admin key access to admin job info (should fail)
- *  - successful job run
  *  - invalid order id in job run
  *  - no api key usages remaining
  *  - invalid product
@@ -180,6 +179,8 @@ describe("neuropacs JS Unit Tests", () => {
       orderId: orderId,
       fileArray: [testFile]
     });
+
+    await sleep(30000);
 
     const job = await npcsAdmin.runJob({
       orderId: orderId,
