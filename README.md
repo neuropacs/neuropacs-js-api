@@ -105,7 +105,7 @@ Option 2: Import via CDN
       });
 
       // GET RESULTS
-      // --> Valid format options: JSON, TXT, XML, PNG
+      // --> Valid format options: JSON, TXT, XML, PNG, FEATURES
       // --> Valid dataType options: RAW, BLOB
       const results = await npcs.getResults({
         orderId: orderId
