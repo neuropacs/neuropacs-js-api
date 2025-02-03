@@ -1,6 +1,6 @@
 /*!
- * neuropacs JavaScript API v1.1.8
- * (c) 2024 neuropacs
+ * neuropacs JavaScript API v1.2.0
+ * (c) 2025 neuropacs
  * Released under the MIT License.
  */
 
@@ -531,6 +531,7 @@ class Neuropacs {
    * @param {Number} partIndex Index of zip file
    * @param {String} uploadId Base64 uploadId
    * @param {Object} uploadParts Uploaded parts object
+   * @param {int} finalPart Final part of dataset upload (0==no, 1==yes)
    * @returns status code
    */
   #completeMultipartUpload = async (
@@ -538,7 +539,8 @@ class Neuropacs {
     datasetId,
     zipIndex,
     uploadId,
-    uploadParts
+    uploadParts,
+    finalPart
   ) => {
     try {
       const url = `${this.serverUrl}/api/completeMultipartUpload/`;
@@ -554,7 +556,8 @@ class Neuropacs {
         uploadId: uploadId,
         uploadParts: uploadParts,
         zipIndex: zipIndex,
-        orderId: orderId
+        orderId: orderId,
+        finalPart: finalPart
       };
 
       const encryptedBody = await this.#encryptAesCtr(
@@ -849,13 +852,25 @@ class Neuropacs {
           );
 
           // Complete multipart upload
-          await this.#completeMultipartUpload(
-            orderId,
-            orderId,
-            String(zipIndex),
-            uploadId,
-            [{ PartNumber: 1, ETag: ETag }]
-          );
+          if (filesUploaded - 1 == fileArray.length) {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: 1, ETag: ETag }],
+              1
+            );
+          } else {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: 1, ETag: ETag }],
+              0
+            );
+          }
 
           // Reset jsZip and currentZipSize
           jsZip = new JSZip();
@@ -921,7 +936,8 @@ class Neuropacs {
           orderId,
           String(zipIndex),
           uploadId,
-          [{ PartNumber: 1, ETag: ETag }]
+          [{ PartNumber: 1, ETag: ETag }],
+          1
         );
       }
 
@@ -1067,13 +1083,25 @@ class Neuropacs {
           );
 
           // Complete multipart upload
-          await this.#completeMultipartUpload(
-            orderId,
-            orderId,
-            String(zipIndex),
-            uploadId,
-            [{ PartNumber: partNumber, ETag: eTag }]
-          );
+          if (i == totalInstances) {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: partNumber, ETag: eTag }],
+              1
+            );
+          } else {
+            await this.#completeMultipartUpload(
+              orderId,
+              orderId,
+              String(zipIndex),
+              uploadId,
+              [{ PartNumber: partNumber, ETag: eTag }],
+              0
+            );
+          }
 
           // Reset zip and currentZipSize
           jsZip = new JSZip();
@@ -1135,7 +1163,8 @@ class Neuropacs {
           orderId,
           String(zipIndex),
           uploadId,
-          [{ PartNumber: partNumber, ETag: eTag }]
+          [{ PartNumber: partNumber, ETag: eTag }],
+          1
         );
       }
 
@@ -1288,11 +1317,11 @@ class Neuropacs {
       format = String(format).toLowerCase();
       dataType = String(dataType).toLowerCase();
 
-      const validFormats = ["txt", "xml", "json", "png"];
+      const validFormats = ["txt", "xml", "json", "png", "features"];
 
       // Check for invalid format
       if (!validFormats.includes(format)) {
-        throw new Error(`Invalid format`);
+        throw new Error(`Invalid format.`);
       }
 
       const body = {
@@ -1326,6 +1355,7 @@ class Neuropacs {
         case "txt":
         case "json":
         case "xml":
+        case "features":
           rawData = await this.#decryptAesCtr(text, this.aesKey, "string");
           break;
         case "png":
@@ -1338,6 +1368,8 @@ class Neuropacs {
         return rawData;
       } else if (dataType === "blob") {
         switch (format) {
+          case "features":
+            return new Blob([rawData], { type: "text/csv" });
           case "txt":
             return new Blob([rawData], { type: "text/plain" });
           case "json":
@@ -1354,6 +1386,171 @@ class Neuropacs {
       throw new Error(
         `Result retrieval failed: ${error.message || error.toString()}`
       );
+    }
+  }
+
+  async getReport({ format, startDate, endDate }) {
+    try {
+      if (!format || !startDate || !endDate) {
+        throw new Error("Parameter is missing.");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
+      // Check if dates are valid
+      let startInputDate, endInputDate;
+      try {
+        startInputDate = new Date(startDate);
+        endInputDate = new Date(endDate);
+
+        // Ensure valid dates and the correct format
+        if (
+          isNaN(startInputDate.getTime()) ||
+          isNaN(endInputDate.getTime()) ||
+          !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(startDate) ||
+          !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(endDate)
+        ) {
+          throw new Error();
+        }
+      } catch (e) {
+        throw new Error("Invalid date format (MM/DD/YYYY).");
+      }
+
+      // Check if dates are in the future or invalid
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+
+      if (endInputDate > today || startInputDate > today) {
+        throw new Error("Provided date must not exceed current date.");
+      } else if (startInputDate > endInputDate) {
+        throw new Error("startDate must not exceed endDate.");
+      }
+
+      const url = `${this.serverUrl}/api/getReport/`;
+
+      const headers = {
+        "Content-Type": "text/plain",
+        "Connection-Id": this.connectionId,
+        "Origin-Type": this.originType
+      };
+
+      format = format.toLowerCase();
+
+      const validFormats = ["txt", "email", "json"];
+      if (!validFormats.includes(format)) {
+        throw new Error("Invalid format.");
+      }
+
+      const body = {
+        startDate: startDate,
+        endDate: endDate,
+        format: format
+      };
+
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
+      }
+
+      const text = await response.text();
+      const resString = await this.#decryptAesCtr(text, this.aesKey, "string");
+
+      if (format == "json") {
+        return JSON.parse(resString);
+      } else {
+        return resString;
+      }
+    } catch (error) {
+      throw new Error(`Report retrieval failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * QC/Compliance check on dataset
+   * @param {String} orderId Unique base64 identifier for the order.
+   * @param {String} format Format 
+  
+   * @returns {String} QC result
+   */
+  async qcCheck({ orderId, format }) {
+    try {
+      if (!orderId || !format) {
+        throw new Error("Parameter is missing");
+      }
+
+      if (!this.connectionId || !this.aesKey) {
+        throw new Error(
+          "Missing session parameters, start a new session with 'connect()' and try again."
+        );
+      }
+
+      // Make format case insensative
+      format = String(format).toLowerCase();
+
+      const validFormats = ["txt", "csv", "json"];
+
+      // Check for invalid format
+      if (!validFormats.includes(format)) {
+        throw new Error(`Invalid format.`);
+      }
+
+      const url = `${this.serverUrl}/api/qcCheck/`;
+      const headers = {
+        "Content-Type": "text/plain",
+        "Connection-Id": this.connectionId,
+        "Origin-Type": this.originType
+      };
+
+      const body = {
+        orderId: orderId,
+        format: format
+      };
+
+      const encryptedBody = await this.#encryptAesCtr(
+        body,
+        this.aesKey,
+        "JSON",
+        "string"
+      );
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: encryptedBody
+      });
+
+      if (!response.ok) {
+        throw new Error(JSON.parse(await response.text()).error);
+      }
+
+      const text = await response.text();
+
+      let out;
+      if (format == "json") {
+        out = await this.#decryptAesCtr(text, this.aesKey, "JSON");
+      } else {
+        out = await this.#decryptAesCtr(text, this.aesKey, "string");
+      }
+
+      return out;
+    } catch (error) {
+      throw new Error(`QC check failed: ${error.message || error.toString()}`);
     }
   }
 }

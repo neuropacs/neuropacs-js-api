@@ -1,6 +1,6 @@
 {
   "name": "neuropacs-js-sdk",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Connect to NeuroPACS diagnostic capabilities with our JavaScript SDK.",
   "main": "index.js",
   "scripts": {

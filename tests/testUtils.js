@@ -19,6 +19,14 @@ const productId = "Atypical/MSAp/PSP-v1.0";
 
 const originType = "JS Integration Tests";
 
+const testFile = new File(
+  [new Blob(["DICOM"], { type: "application/dicom" })],
+  "example.dcm",
+  { type: "application/dicom", lastModified: new Date() }
+);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const isValidUuid4 = (value) => {
   return uuidValidate(value) && uuidVersion(value) === 4;
 };
@@ -125,6 +133,19 @@ const isValidResultBlobJson = (result) => {};
 
 const isValidResultBlobPng = (result) => {};
 
+const isValidReportTxt = (result) => {
+  return typeof result == "string" && String(result).length > 0;
+};
+
+const isValidReportJson = (result) => {
+  try {
+    JSON.stringify(result);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
 module.exports = {
   isValidAesCtrKey,
   isObject,
@@ -141,6 +162,8 @@ module.exports = {
   isValidResultRawPng,
   isValidResultBlobPng,
   isValidSessionObj,
+  isValidReportJson,
+  isValidReportTxt,
   serverUrl,
   invalidKey,
   invalidServerUrl,
@@ -149,5 +172,7 @@ module.exports = {
   noUsageRemainingApiKey,
   originType,
   invalidOrderId,
-  productId
+  productId,
+  testFile,
+  sleep
 };
