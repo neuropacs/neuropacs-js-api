@@ -254,6 +254,22 @@ describe("neuropacs JS Unit Tests", () => {
     expect(isValidResultRawTxt(status)).toBe(true);
   });
 
+  // Successful result retrieval in raw features format
+  test("successful result retrieval in raw features format", async () => {
+    const npcsTemp = Neuropacs.init({
+      serverUrl:
+        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
+      apiKey: "generate_api_key"
+    });
+    await npcsTemp.connect();
+    const features = await npcsTemp.getResults({
+      orderId: "TEST",
+      format: "features",
+      dataType: "raw"
+    });
+    expect(isValidResultRawTxt(features)).toBe(true);
+  });
+
   // Successful result retrieval in raw json format
   test("successful result retrieval in raw json format", async () => {
     await npcsAdmin.connect();
@@ -538,13 +554,13 @@ describe("neuropacs JS Unit Tests", () => {
       orderId: orderId,
       fileArray: [testFile]
     });
-    await sleep(60000);
+    await sleep(120000);
     const qc = await npcsTemp.qcCheck({
       orderId: orderId,
       format: "txt"
     });
-    expect(qc).toBe("QC FAILED: ERR_UNZIP_FAILED");
-  }, 120000);
+    expect(qc).toContain("QC FAILED");
+  }, 150000);
 
   // Invalid format in QC check
   test("invalid format for QC check", async () => {

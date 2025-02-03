@@ -1,6 +1,6 @@
 /*!
- * neuropacs JavaScript API v1.1.8
- * (c) 2024 neuropacs
+ * neuropacs JavaScript API v1.2.0
+ * (c) 2025 neuropacs
  * Released under the MIT License.
  */
 
@@ -1317,7 +1317,7 @@ class Neuropacs {
       format = String(format).toLowerCase();
       dataType = String(dataType).toLowerCase();
 
-      const validFormats = ["txt", "xml", "json", "png"];
+      const validFormats = ["txt", "xml", "json", "png", "features"];
 
       // Check for invalid format
       if (!validFormats.includes(format)) {
@@ -1355,6 +1355,7 @@ class Neuropacs {
         case "txt":
         case "json":
         case "xml":
+        case "features":
           rawData = await this.#decryptAesCtr(text, this.aesKey, "string");
           break;
         case "png":
@@ -1367,6 +1368,8 @@ class Neuropacs {
         return rawData;
       } else if (dataType === "blob") {
         switch (format) {
+          case "features":
+            return new Blob([rawData], { type: "text/csv" });
           case "txt":
             return new Blob([rawData], { type: "text/plain" });
           case "json":

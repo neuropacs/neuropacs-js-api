@@ -9,12 +9,9 @@ const serverUrl =
 const invalidServerUrl =
   "https://invalid.execute-api.us-east-2.amazonaws.com/not_real";
 
-// const adminKey = process.env.ADMIN_API_KEY;
-const adminKey = "Ln0Zf11LRP9vVB8UgxJNl4RSmoBERexb83CiOvCq";
-// const regKey = process.env.REG_API_KEY;
-const regKey = "r7TK56hInGaj3aNug4Mmc5mqCZ3fVQjT1HilX6Tp";
-// const noUsageRemainingApiKey = process.env.NO_USAGES_REMAINING_API_KEY;
-const noUsageRemainingApiKey = "DsX5YzUkTq84ddbeprc29Bm20u0ZEdO9jNQxL3Mg";
+const adminKey = process.env.ADMIN_API_KEY;
+const regKey = process.env.REG_API_KEY;
+const noUsageRemainingApiKey = process.env.NO_USAGES_REMAINING_API_KEY;
 
 const invalidKey = "invalidApiKey123";
 const invalidOrderId = "notARealOrderId";
