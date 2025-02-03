@@ -223,6 +223,9 @@
       originType: originType
     });
 
+  <span class="code-comment">// Create a session</span>
+  <span class="code-keyword">const</span> conn = <span class="code-keyword">await</span> npcs.<span class="code-function">connect();</span>
+
   <span class="code-comment">// Generate the report</span>  
   <span class="code-keyword">const</span> report = npcs.<span class="code-function">getReport</span>({
     startDate: startDate,
