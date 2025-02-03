@@ -257,13 +257,8 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Successful result retrieval in raw features format
   test("successful result retrieval in raw features format", async () => {
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-    await npcsTemp.connect();
-    const features = await npcsTemp.getResults({
+    await npcsReg.connect();
+    const features = await npcsReg.getResults({
       orderId: "TEST",
       format: "features",
       dataType: "raw"
@@ -310,13 +305,6 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Successful report retrieval in txt format
   test("successful report retrieval in txt format", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
     const today = new Date();
     const tenDaysAgo = new Date(today);
     tenDaysAgo.setDate(today.getDate() - 10);
@@ -327,8 +315,8 @@ describe("neuropacs JS Unit Tests", () => {
       tenDaysAgo.getMonth() + 1
     }/${tenDaysAgo.getDate()}/${tenDaysAgo.getFullYear()}`;
 
-    await npcsTemp.connect();
-    const report = await npcsTemp.getReport({
+    await npcsReg.connect();
+    const report = await npcsReg.getReport({
       format: "txt",
       startDate: tenDaysAgoStr,
       endDate: todayStr
@@ -338,13 +326,6 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Successful report retrieval in json format
   test("successful report retrieval in json format", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
     const today = new Date();
     const tenDaysAgo = new Date(today);
     tenDaysAgo.setDate(today.getDate() - 10);
@@ -355,8 +336,8 @@ describe("neuropacs JS Unit Tests", () => {
       tenDaysAgo.getMonth() + 1
     }/${tenDaysAgo.getDate()}/${tenDaysAgo.getFullYear()}`;
 
-    await npcsTemp.connect();
-    const report = await npcsTemp.getReport({
+    await npcsReg.connect();
+    const report = await npcsReg.getReport({
       format: "json",
       startDate: tenDaysAgoStr,
       endDate: todayStr
@@ -366,13 +347,6 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Successful report retrieval in email format
   test("successful report retrieval in email format", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
     const today = new Date();
     const tenDaysAgo = new Date(today);
     tenDaysAgo.setDate(today.getDate() - 10);
@@ -383,8 +357,8 @@ describe("neuropacs JS Unit Tests", () => {
       tenDaysAgo.getMonth() + 1
     }/${tenDaysAgo.getDate()}/${tenDaysAgo.getFullYear()}`;
 
-    await npcsTemp.connect();
-    const report = await npcsTemp.getReport({
+    await npcsReg.connect();
+    const report = await npcsReg.getReport({
       format: "email",
       startDate: tenDaysAgoStr,
       endDate: todayStr
@@ -394,14 +368,7 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Invalid start date format in report retrieval
   test("invalid start date format in report retrieval", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
-    await npcsTemp.connect();
+    await npcsReg.connect();
 
     const today = new Date();
     const todayStr = `${
@@ -409,7 +376,7 @@ describe("neuropacs JS Unit Tests", () => {
     }/${today.getDate()}/${today.getFullYear()}`;
 
     await expect(
-      npcsTemp.getReport({
+      npcsReg.getReport({
         format: "txt",
         startDate: "invalid",
         endDate: todayStr
@@ -421,14 +388,7 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Invalid end date format in report retrieval
   test("invalid end date format in report retrieval", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
-    await npcsTemp.connect();
+    await npcsReg.connect();
 
     const today = new Date();
     const todayStr = `${
@@ -436,7 +396,7 @@ describe("neuropacs JS Unit Tests", () => {
     }/${today.getDate()}/${today.getFullYear()}`;
 
     await expect(
-      npcsTemp.getReport({
+      npcsReg.getReport({
         format: "txt",
         startDate: todayStr,
         endDate: "invalid"
@@ -448,14 +408,7 @@ describe("neuropacs JS Unit Tests", () => {
 
   // End date before start date in report retrieval
   test("end date before start date in report retrieval", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
-    await npcsTemp.connect();
+    await npcsReg.connect();
 
     const today = new Date();
     const tenDaysAgo = new Date(today);
@@ -468,7 +421,7 @@ describe("neuropacs JS Unit Tests", () => {
     }/${tenDaysAgo.getDate()}/${tenDaysAgo.getFullYear()}`;
 
     await expect(
-      npcsTemp.getReport({
+      npcsReg.getReport({
         format: "txt",
         startDate: todayStr,
         endDate: tenDaysAgoStr
@@ -480,14 +433,7 @@ describe("neuropacs JS Unit Tests", () => {
 
   // End date exceeds current date in report retrieval
   test("end date exceeds current date in report retrieval", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
-    await npcsTemp.connect();
+    await npcsReg.connect();
 
     const today = new Date();
     const tenDaysAhead = new Date(today);
@@ -500,7 +446,7 @@ describe("neuropacs JS Unit Tests", () => {
     }/${tenDaysAhead.getDate()}/${tenDaysAhead.getFullYear()}`;
 
     await expect(
-      npcsTemp.getReport({
+      npcsReg.getReport({
         format: "txt",
         startDate: todayStr,
         endDate: tenDaysAheadStr
@@ -512,14 +458,7 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Start date exceeds current date in report retrieval
   test("start date exceeds current date in report retrieval", async () => {
-    // TODO: CHANGE THIS
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-
-    await npcsTemp.connect();
+    await npcsReg.connect();
 
     const today = new Date();
     const tenDaysAhead = new Date(today);
@@ -532,7 +471,7 @@ describe("neuropacs JS Unit Tests", () => {
     }/${tenDaysAhead.getDate()}/${tenDaysAhead.getFullYear()}`;
 
     await expect(
-      npcsTemp.getReport({
+      npcsReg.getReport({
         format: "txt",
         startDate: tenDaysAheadStr,
         endDate: todayStr
@@ -544,19 +483,14 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Successful run QC check (DCM2NIIX error)
   test("successful run QC check", async () => {
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-    await npcsTemp.connect();
-    const orderId = await npcsTemp.newJob();
-    await npcsTemp.uploadDatasetFromFileArray({
+    await npcsReg.connect();
+    const orderId = await npcsReg.newJob();
+    await npcsReg.uploadDatasetFromFileArray({
       orderId: orderId,
       fileArray: [testFile]
     });
     await sleep(120000);
-    const qc = await npcsTemp.qcCheck({
+    const qc = await npcsReg.qcCheck({
       orderId: orderId,
       format: "txt"
     });
@@ -565,16 +499,11 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Invalid format in QC check
   test("invalid format for QC check", async () => {
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-    await npcsTemp.connect();
-    const orderId = await npcsTemp.newJob();
+    await npcsReg.connect();
+    const orderId = await npcsReg.newJob();
 
     await expect(
-      npcsTemp.qcCheck({
+      npcsReg.qcCheck({
         orderId: orderId,
         format: "not_real"
       })
@@ -583,16 +512,11 @@ describe("neuropacs JS Unit Tests", () => {
 
   // No dataset found in QC check
   test("no dataset found in QC check", async () => {
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-    await npcsTemp.connect();
-    const orderId = await npcsTemp.newJob();
+    await npcsReg.connect();
+    const orderId = await npcsReg.newJob();
 
     await expect(
-      npcsTemp.qcCheck({
+      npcsReg.qcCheck({
         orderId: orderId,
         format: "txt"
       })
@@ -603,19 +527,14 @@ describe("neuropacs JS Unit Tests", () => {
 
   // Dataset in use in QC check
   test("dataset in use in QC check", async () => {
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-    await npcsTemp.connect();
-    const orderId = await npcsTemp.newJob();
-    await npcsTemp.uploadDatasetFromFileArray({
+    await npcsReg.connect();
+    const orderId = await npcsReg.newJob();
+    await npcsReg.uploadDatasetFromFileArray({
       orderId: orderId,
       fileArray: [testFile]
     });
     await expect(
-      npcsTemp.qcCheck({
+      npcsReg.qcCheck({
         orderId: orderId,
         format: "txt"
       })
