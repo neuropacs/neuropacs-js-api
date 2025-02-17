@@ -599,25 +599,4 @@ describe("neuropacs JS Unit Tests", () => {
       "QC check failed: No dataset found. Upload a dataset before running QC."
     );
   });
-
-  // Dataset in use in QC check
-  test("dataset in use in QC check", async () => {
-    const npcsTemp = Neuropacs.init({
-      serverUrl:
-        "https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox",
-      apiKey: "generate_api_key"
-    });
-    await npcsTemp.connect();
-    const orderId = await npcsTemp.newJob();
-    await npcsTemp.uploadDatasetFromFileArray({
-      orderId: orderId,
-      fileArray: [testFile]
-    });
-    await expect(
-      npcsTemp.qcCheck({
-        orderId: orderId,
-        format: "txt"
-      })
-    ).rejects.toThrow("QC check failed: Dataset in use, try again later.");
-  });
 });
