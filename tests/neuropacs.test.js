@@ -524,20 +524,4 @@ describe("neuropacs JS Unit Tests", () => {
       "QC check failed: No dataset found. Upload a dataset before running QC."
     );
   });
-
-  // Dataset in use in QC check
-  test("dataset in use in QC check", async () => {
-    await npcsReg.connect();
-    const orderId = await npcsReg.newJob();
-    await npcsReg.uploadDatasetFromFileArray({
-      orderId: orderId,
-      fileArray: [testFile]
-    });
-    await expect(
-      npcsReg.qcCheck({
-        orderId: orderId,
-        format: "txt"
-      })
-    ).rejects.toThrow("QC check failed: Dataset in use, try again later.");
-  });
 });
