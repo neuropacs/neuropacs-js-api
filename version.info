@@ -1,2 +1,4 @@
 v1.2.1:
     - Remove test_dataset_in_use_qc_check integration test
+    - Add sbom (syft dir:. -o cyclonedx-json=sbom.json)
+        - must manually add jszip and dicom-web client
